@@ -183,6 +183,7 @@ func begin_surface_impact(surface: Dictionary) -> void:
 	var velocity := car.linear_velocity
 	car.freeze = true
 	car.visible = impact_kind == "water"
+	car.clear_jets()
 	sink_origin = Vector3(car.position.x, surface.height + 0.15, car.position.z)
 	sink_basis = car.basis
 	impact_effect = Impact.new()
@@ -272,7 +273,7 @@ func build_hud() -> void:
 	hud_status = ui_label(bottom, "", Vector2(20, 125), 11, Color("9cb6bd"))
 	var controls := panel(root, Vector2(-450, -118), Vector2(420, 88), true, true)
 	ui_label(controls, "W / S  驱动 / 刹车    A / D  转向    Shift  手刹", Vector2(16, 11), 12)
-	ui_label(controls, "SPACE  短暂喷射    ↑↓←→  空中姿态", Vector2(16, 35), 12, Color("b5ec67"))
+	ui_label(controls, "SPACE 短喷 · 方向键姿态喷射 · 落地辅助", Vector2(16, 35), 12, Color("b5ec67"))
 	ui_label(controls, "R 复位   ENTER 重开   M 地图   ESC 暂停", Vector2(16, 59), 12, Color("9cb6bd"))
 	banner = ui_label(root, "", Vector2.ZERO, 36)
 	banner.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
@@ -433,7 +434,7 @@ func _process(dt: float) -> void:
 	hud_time.text = format_time(race.elapsed)
 	hud_gate.text = "BEST %s" % format_time(best_time) if race.finished else "CHECKPOINT  %02d / %02d" % [gates.size() if race.next_gate == 0 else race.next_gate, gates.size()]
 	hud_fuel.value = car.fuel * 100
-	hud_status.text = "%s / CONTACT %d/4 / %d%%" % ["JET ACTIVE" if car.burning else "READY" if car.fuel > 0.15 else "LOW PRESSURE", car.contacts, roundi(car.fuel * 100)]
+	hud_status.text = "%s / CONTACT %d/4 / %d%%" % [car.jet_mode, car.contacts, roundi(car.fuel * 100)]
 	map.next_gate = race.next_gate
 	map.queue_redraw()
 	for i in course.gate_lights.size():
@@ -449,6 +450,6 @@ func _process(dt: float) -> void:
 	elif car.position.distance_to(course.gap_pose.origin) < 70:
 		hud_hint.text = "前方 25m 断桥 · 提前短喷约 0.6–0.7 秒 · 注意落点"
 	elif car.contacts == 0:
-		hud_hint.text = "AIRBORNE · ↑↓ 俯仰 / ←→ 侧倾 · 留意落点：水面沉没，陆地撞击碎裂"
+		hud_hint.text = "落地缓冲喷射中 · 消耗剩余气量 · 准备悬挂接地" if car.jet_mode == "LANDING BRAKE" else "AIRBORNE · 方向键耗气调整姿态 · 留气着陆：下方有赛道时自动缓冲"
 	else:
 		hud_hint.text = "真实悬挂 / 短时喷射    ·    M 地图菜单    ·    请留意前方绿色起飞提示"

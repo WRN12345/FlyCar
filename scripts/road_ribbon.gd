@@ -78,6 +78,7 @@ func build(route: Array[Vector3], gap: Array[bool], distances: Array[float], mat
 		node.material_override = material
 		add_child(node)
 	var body := StaticBody3D.new()
+	body.set_meta("landing_surface", true)
 	var collider := CollisionShape3D.new()
 	var shape := ConcavePolygonShape3D.new()
 	shape.backface_collision = true

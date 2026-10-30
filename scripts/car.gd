@@ -3,11 +3,14 @@ extends RigidBody3D
 const Geo = preload("res://scripts/geometry.gd")
 const Model = preload("res://scripts/vehicle_math.gd")
 const Visual = preload("res://scripts/roadster_visual.gd")
+const Thrusters = preload("res://scripts/thruster_control.gd")
+const JetEffect = preload("res://scripts/jet_effect.gd")
 
 @export var spring_rate := 42000.0
 @export var damper := 4200.0
 @export var tire_grip := 1.2
 @export var nozzle_force := 10000.0
+@export var auto_landing_enabled := true
 const REST := 0.55
 const RADIUS := 0.36
 var fuel := 1.0
@@ -17,11 +20,17 @@ var steering := 0.0
 var recharge_delay := 0.0
 var wheels: Array[Node3D] = []
 var rays: Array[RayCast3D] = []
-var jets: Array[MeshInstance3D] = []
+var jet_effect: Node3D
 var wheel_spin := 0.0
 var pending_reset := false
 var reset_pose := Transform3D.IDENTITY
 var chassis_collision: CollisionShape3D
+var nozzle_duties := PackedFloat32Array([0, 0, 0, 0])
+var nozzle_hits: Array[Dictionary] = []
+var exhaust_hits: Array[Dictionary] = []
+var jet_mode := "READY"
+var landing_height := INF
+var thrust_direction := Vector3.UP
 
 static func configure_inputs() -> void:
 	var keys := {"throttle": KEY_W, "brake": KEY_S, "steer_left": KEY_A, "steer_right": KEY_D, "burst": KEY_SPACE, "pitch_forward": KEY_UP, "pitch_back": KEY_DOWN, "roll_left": KEY_LEFT, "roll_right": KEY_RIGHT, "recover": KEY_R, "restart": KEY_ENTER, "pause": KEY_ESCAPE, "handbrake": KEY_SHIFT}
@@ -50,7 +59,6 @@ func _ready() -> void:
 	add_child(collision)
 	Visual.build(self)
 	var rim := Geo.material(Color("97a6b3"), 0.9)
-	var jet_mat := Geo.material(Color("85e5ff"), 0.0, 3.0)
 	for z in [-1.36, 1.36]:
 		for x in [-0.93, 0.93]:
 			var ray := RayCast3D.new()
@@ -65,17 +73,44 @@ func _ready() -> void:
 			wheels.append(wheel)
 			Visual.build_wheel(wheel, signf(x), RADIUS)
 			Geo.cylinder(self, 0.10, 0.12, Vector3(x * 0.68, -0.19, z * 0.70), rim)
-			var jet_mesh := CylinderMesh.new()
-			jet_mesh.top_radius = 0.07
-			jet_mesh.bottom_radius = 0.20
-			jet_mesh.height = 0.9
-			var jet := Geo.mesh_node(self, jet_mesh, Vector3(x * 0.68, -0.65, z * 0.70), jet_mat)
-			jet.visible = false
-			jets.append(jet)
+	jet_effect = JetEffect.new()
+	add_child(jet_effect)
+
+func _process(_dt: float) -> void:
+	if freeze or pending_reset or not visible:
+		clear_jets()
+	jet_effect.update_output(self)
 
 func reset_to(pose: Transform3D) -> void:
 	reset_pose = pose
 	pending_reset = true
+	clear_jets()
+
+func clear_jets() -> void:
+	nozzle_duties.fill(0)
+	burning = false
+	jet_mode = "READY"
+	nozzle_hits.clear()
+	exhaust_hits.clear()
+	landing_height = INF
+	if is_instance_valid(jet_effect):
+		jet_effect.clear()
+
+func probe_landing(state: PhysicsDirectBodyState3D) -> bool:
+	nozzle_hits.clear()
+	landing_height = 0.0
+	var valid := 0
+	for nozzle in Thrusters.NOZZLES:
+		var origin: Vector3 = state.transform * nozzle
+		var query := PhysicsRayQueryParameters3D.create(origin, origin + Vector3.DOWN * Thrusters.PROBE_LENGTH)
+		query.exclude = [get_rid()]
+		var hit := state.get_space_state().intersect_ray(query)
+		nozzle_hits.append(hit)
+		if not hit.is_empty() and hit.normal.dot(Vector3.UP) > 0.75 and hit.collider.get_meta("landing_surface", false):
+			landing_height += origin.distance_to(hit.position)
+			valid += 1
+	landing_height = landing_height / valid if valid > 0 else INF
+	return valid >= 3
 
 func lowest_chassis_y() -> float:
 	var half: Vector3 = (chassis_collision.shape as BoxShape3D).size * 0.5
@@ -128,20 +163,36 @@ func _integrate_forces(state: PhysicsDirectBodyState3D) -> void:
 		wheels[i].get_node("WheelVisual").rotation.x = wheel_spin
 	wheel_spin -= speed / RADIUS * dt
 	var burst_requested := Input.is_action_pressed("burst")
-	burning = burst_requested and fuel > 0.0001
+	var road_below := probe_landing(state)
+	var landing := Thrusters.landing_duty(landing_height, state.linear_velocity.y, up.dot(Vector3.UP), road_below, contacts, nozzle_force * 4 / mass) if auto_landing_enabled else 0.0
+	var pitch := Input.get_axis("pitch_back", "pitch_forward") if contacts == 0 else 0.0
+	var roll := Input.get_axis("roll_right", "roll_left") if contacts == 0 else 0.0
+	var base := 1.0 if burst_requested else landing
+	var result: Dictionary = Thrusters.consume(Thrusters.duties(base, pitch, roll), fuel, dt)
+	nozzle_duties = result.duties
+	fuel = result.fuel
+	burning = false
+	for duty in nozzle_duties:
+		burning = burning or duty > 0.0001
+	jet_mode = "LIFT" if burst_requested else "LANDING BRAKE" if landing > 0 else "ATTITUDE" if burning else "READY"
+	if not burning:
+		jet_mode = "LOW PRESSURE" if fuel <= 0.15 else "READY"
+	thrust_direction = (up + forward * 0.20).normalized() if burst_requested else up
+	exhaust_hits.clear()
+	for i in Thrusters.NOZZLES.size():
+		var hit := {}
+		if nozzle_duties[i] > 0.001:
+			var origin: Vector3 = state.transform * Thrusters.NOZZLES[i]
+			var query := PhysicsRayQueryParameters3D.create(origin, origin - thrust_direction * 3.5)
+			query.exclude = [get_rid()]
+			hit = state.get_space_state().intersect_ray(query)
+		exhaust_hits.append(hit)
 	if burning:
-		var fraction := minf(1.0, fuel * 1.2 / dt)
-		for ray in rays:
-			var local_nozzle := Vector3(ray.position.x * 0.68, -0.19, ray.position.z * 0.70)
-			state.apply_force((up + forward * 0.20).normalized() * nozzle_force * fraction, state.transform.basis * local_nozzle)
+		for i in Thrusters.NOZZLES.size():
+			state.apply_force(thrust_direction * nozzle_force * nozzle_duties[i], state.transform.basis * Thrusters.NOZZLES[i])
 		recharge_delay = 0.8
 	else:
 		recharge_delay = maxf(0.0, recharge_delay - dt)
-	fuel = Model.next_fuel(fuel, burning, contacts >= 3 and recharge_delay <= 0.0 and not burst_requested, dt)
-	for jet in jets:
-		jet.visible = burning
-	if contacts == 0:
-		var pitch := Input.get_axis("pitch_back", "pitch_forward")
-		var roll := Input.get_axis("roll_right", "roll_left")
-		state.apply_torque(state.transform.basis.x * pitch * 2600.0 + forward * roll * 2200.0)
+	if not burning:
+		fuel = Model.next_fuel(fuel, false, contacts >= 3 and recharge_delay <= 0.0 and not burst_requested, dt)
 	state.apply_central_force(-state.linear_velocity * state.linear_velocity.length() * 0.43)

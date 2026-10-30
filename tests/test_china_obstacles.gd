@@ -57,4 +57,8 @@ func run() -> void:
 		check((world.car.position - gap.origin).dot(-gap.basis.z) > 19 and world.death_remaining == 0 and world.car.position.y > world.course.road_height_at(world.car.position) - 1, "bridge physically clearable: " + world.tracks[index].id)
 		Input.action_release("throttle")
 	print("Chinese physical obstacles: ", checks - failures, "/", checks, " passed")
+	world.car.clear_jets()
+	world.queue_free()
+	await process_frame
+	await create_timer(0.08).timeout
 	quit(1 if failures else 0)
