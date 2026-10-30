@@ -4,7 +4,9 @@ signal gate_entered(body: Node3D, index: int)
 const Geo = preload("res://scripts/geometry.gd")
 const Catalog = preload("res://scripts/track_catalog.gd")
 const Terrain = preload("res://scripts/terrain.gd")
+const Ribbon = preload("res://scripts/road_ribbon.gd")
 var terrain: Node3D
+var road: Node3D
 var data: Dictionary
 var route: Array[Vector3] = []
 var gates: Array[Transform3D] = []
@@ -48,6 +50,14 @@ func build(definition: Dictionary) -> void:
 		batches[key] = {"material": materials[key], "transforms": []}
 	road_body = StaticBody3D.new()
 	add_child(road_body)
+	var gap_mask: Array[bool] = []
+	for i in route.size():
+		var segment := route[i].distance_to(route[(i + 1) % route.size()])
+		var delta := absf(distances[i] + segment * 0.5 - gap_distance)
+		gap_mask.append(minf(delta, length - delta) < 12.5)
+	road = Ribbon.new()
+	add_child(road)
+	road.build(route, gap_mask, distances, materials)
 	for i in route.size():
 		var a := route[i]
 		var b := route[(i + 1) % route.size()]
@@ -56,22 +66,13 @@ func build(definition: Dictionary) -> void:
 		if segment < 0.01:
 			continue
 		var basis := Basis.looking_at((b - a).normalized())
-		if absf(distances[i] + segment * 0.5 - gap_distance) < 12.5:
+		if gap_mask[i]:
 			continue
-		add_box(Vector3(20, 0.7, segment + 0.18), center - Vector3.UP * 0.35, basis, "shoulder", true)
-		add_box(Vector3(18, 0.035, segment + 0.2), center + Vector3.UP * 0.02, basis, "asphalt")
-		for side in [-1.0, 1.0]:
-			add_box(Vector3(0.18, 0.04, segment + 0.2), center + basis.x * side * 8.45 + Vector3.UP * 0.045, basis, "edge")
-			add_box(Vector3(0.65, 0.08, segment + 0.2), center + basis.x * side * 9.1 + Vector3.UP * 0.04, basis, "accent" if i % 2 else "white")
-			# Low guards do not prevent a misjudged airborne exit.
-			add_box(Vector3(0.22, 0.45, segment + 0.2), center + basis.x * side * 9.85 + Vector3.UP * 0.23, basis, "dark", true)
-		if i % 2 == 0:
-			add_box(Vector3(0.18, 0.04, segment * 0.5), center + Vector3.UP * 0.045, basis, "edge")
 		if i % 20 == 0:
 			add_box(Vector3(2.5, center.y, 2.5), Vector3(center.x, center.y / 2 - 0.8, center.z), Basis.IDENTITY, "dark")
 		if i % 24 == 0:
-			add_box(Vector3(0.18, 5, 0.18), center + basis.x * 10.7 + Vector3.UP * 2.5, basis, "dark")
-			add_box(Vector3(0.4, 0.16, 2.3), center + basis.x * 10.7 + Vector3.UP * 5, basis, "white")
+			add_box(Vector3(0.18, 5, 0.18), road.offset_point(i, 10.7) + Vector3.UP * 2.5, basis, "dark")
+			add_box(Vector3(0.4, 0.16, 2.3), road.offset_point(i, 10.7) + Vector3.UP * 5, basis, "white")
 	add_box(Vector3(18, 1.25, 1.6), barrier_pose.origin + Vector3.UP * 0.625, barrier_pose.basis, "warning", true)
 	for x in range(-8, 9, 2):
 		add_box(Vector3(0.7, 0.9, 0.05), barrier_pose * Vector3(x, 0.65, 0.84), barrier_pose.basis * Basis(Vector3.FORWARD, 0.45), "dark")

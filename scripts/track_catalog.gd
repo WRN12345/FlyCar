@@ -81,12 +81,52 @@ static func sample(data: Dictionary) -> Array[Vector3]:
 		var b := controls[i]
 		var c := controls[(i + 1) % count]
 		var d := controls[(i + 2) % count]
-		var steps := maxi(2, ceili(b.distance_to(c) / 4.0))
+		var steps := maxi(4, ceili(b.distance_to(c) / 1.5))
 		for j in steps:
 			var t := float(j) / steps
-			var point := b.cubic_interpolate(c, a, d, t)
+			var point := centripetal(a, b, c, d, t)
 			point.y += sin(TAU * (i + t) / count) * data.elevation
 			result.append(point)
+	var uniform := resample_closed(result, 2.5)
+	# A six-metre smoothing kernel removes hand-traced pinches without changing layout identity.
+	var smooth: Array[Vector3] = []
+	for i in uniform.size():
+		var sum := Vector3.ZERO
+		var weight_sum := 0.0
+		for offset in range(-8, 9):
+			var weight := exp(-0.5 * pow(offset * 2.5 / 6.0, 2))
+			sum += uniform[posmod(i + offset, uniform.size())] * weight
+			weight_sum += weight
+		smooth.append(sum / weight_sum)
+	return smooth
+
+static func centripetal(a: Vector3, b: Vector3, c: Vector3, d: Vector3, u: float) -> Vector3:
+	var t0 := 0.0
+	var t1 := sqrt(a.distance_to(b))
+	var t2 := t1 + sqrt(b.distance_to(c))
+	var t3 := t2 + sqrt(c.distance_to(d))
+	var t := lerpf(t1, t2, u)
+	var a1 := a.lerp(b, (t - t0) / maxf(t1 - t0, 0.0001))
+	var a2 := b.lerp(c, (t - t1) / maxf(t2 - t1, 0.0001))
+	var a3 := c.lerp(d, (t - t2) / maxf(t3 - t2, 0.0001))
+	var b1 := a1.lerp(a2, (t - t0) / maxf(t2 - t0, 0.0001))
+	var b2 := a2.lerp(a3, (t - t1) / maxf(t3 - t1, 0.0001))
+	return b1.lerp(b2, (t - t1) / maxf(t2 - t1, 0.0001))
+
+static func resample_closed(points: Array[Vector3], spacing: float) -> Array[Vector3]:
+	var total := length_of(points)
+	var count := maxi(12, ceili(total / spacing))
+	var result: Array[Vector3] = []
+	var distance := 0.0
+	var target := 0.0
+	for i in points.size():
+		var a := points[i]
+		var b := points[(i + 1) % points.size()]
+		var segment := a.distance_to(b)
+		while target <= distance + segment and result.size() < count:
+			result.append(a.lerp(b, clampf((target - distance) / maxf(segment, 0.0001), 0, 1)))
+			target = float(result.size()) * total / count
+		distance += segment
 	return result
 
 static func length_of(points: Array) -> float:

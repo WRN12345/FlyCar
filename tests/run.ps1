@@ -12,7 +12,7 @@ function Invoke-Check([string]$Name, [string[]]$Arguments) {
     }
 }
 Invoke-Check 'import' @('--editor', '--import')
-foreach ($name in @('math', 'physics', 'race', 'world', 'obstacles', 'catalog', 'china', 'china_obstacles', 'surfaces')) {
+foreach ($name in @('math', 'physics', 'race', 'world', 'obstacles', 'catalog', 'china', 'china_obstacles', 'surfaces', 'road_corners')) {
     Invoke-Check $name @('--script', "tests/test_$name.gd")
 }
 Write-Output 'PASS: all FlyCar checks completed.'
