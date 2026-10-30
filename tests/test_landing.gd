@@ -39,6 +39,7 @@ func run() -> void:
 	root.add_child(ground)
 	car = load("res://scripts/car.gd").new()
 	root.add_child(car)
+	check(not car.auto_landing_enabled, "landing is manual by default")
 	var ballistic: Dictionary = await drop(false, 1.0)
 	var assisted: Dictionary = await drop(true, 1.0)
 	print("Touchdown m/s: ballistic=", ballistic.speed, " assisted=", assisted.speed)
@@ -49,6 +50,18 @@ func run() -> void:
 	ground.set_meta("landing_surface", false)
 	var terrain: Dictionary = await drop(true, 1.0)
 	check(not terrain.fired and absf(terrain.speed - ballistic.speed) < 0.5, "terrain does not receive road landing assist")
+	car.auto_landing_enabled = false
+	car.reset_to(Transform3D(Basis.IDENTITY, Vector3(100, 25, 0)))
+	car.fuel = 1
+	await frames(3)
+	car.linear_velocity = Vector3(0, -8, 0)
+	Input.action_press("burst")
+	await frames(12)
+	check(car.linear_velocity.y > -7 and absf(car.linear_velocity.z) < 0.05 and car.jet_mode == "DESCENT BRAKE" and car.fuel < 1, "Space brakes descent with gas and no takeoff forward boost")
+	Input.action_release("burst")
+	var release_speed: float = car.linear_velocity.y
+	await frames(3)
+	check(not car.burning and car.linear_velocity.y < release_speed, "releasing Space resumes free descent")
 	car.reset_to(Transform3D(Basis.IDENTITY, Vector3(100, 25, 0)))
 	car.fuel = 0.5
 	await frames(3)

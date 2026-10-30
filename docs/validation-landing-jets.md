@@ -1,5 +1,7 @@
 # Landing jets verification
 
+Current control override (2026-10-30): user selected manual descent. Automatic assist is disabled by default. Space during descent supplies body-up braking without takeoff forward bias; arrows control attitude. HUD reads DESCENT BRAKE. The earlier automatic-assist measurements below remain regression coverage for the optional developer setting.
+
 User approved the linked Bilibili reference as inspiration for a three-phase gas effect. The game parameters are original tuning, not measured Tesla specifications.
 
 ## Behavior

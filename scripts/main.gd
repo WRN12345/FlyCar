@@ -273,7 +273,7 @@ func build_hud() -> void:
 	hud_status = ui_label(bottom, "", Vector2(20, 125), 11, Color("9cb6bd"))
 	var controls := panel(root, Vector2(-450, -118), Vector2(420, 88), true, true)
 	ui_label(controls, "W / S  驱动 / 刹车    A / D  转向    Shift  手刹", Vector2(16, 11), 12)
-	ui_label(controls, "SPACE 短喷 · 方向键姿态喷射 · 落地辅助", Vector2(16, 35), 12, Color("b5ec67"))
+	ui_label(controls, "SPACE 起飞 / 下落减速 · 方向键姿态喷射", Vector2(16, 35), 12, Color("b5ec67"))
 	ui_label(controls, "R 复位   ENTER 重开   M 地图   ESC 暂停", Vector2(16, 59), 12, Color("9cb6bd"))
 	banner = ui_label(root, "", Vector2.ZERO, 36)
 	banner.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
@@ -450,6 +450,6 @@ func _process(dt: float) -> void:
 	elif car.position.distance_to(course.gap_pose.origin) < 70:
 		hud_hint.text = "前方 25m 断桥 · 提前短喷约 0.6–0.7 秒 · 注意落点"
 	elif car.contacts == 0:
-		hud_hint.text = "落地缓冲喷射中 · 消耗剩余气量 · 准备悬挂接地" if car.jet_mode == "LANDING BRAKE" else "AIRBORNE · 方向键耗气调整姿态 · 留气着陆：下方有赛道时自动缓冲"
+		hud_hint.text = "下落减速喷射中 · 方向键调整姿态 · 留意剩余气量" if car.jet_mode == "DESCENT BRAKE" else "AIRBORNE · 下落时按住 Space 喷气减速 · 方向键耗气调整姿态"
 	else:
 		hud_hint.text = "真实悬挂 / 短时喷射    ·    M 地图菜单    ·    请留意前方绿色起飞提示"

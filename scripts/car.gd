@@ -10,7 +10,7 @@ const JetEffect = preload("res://scripts/jet_effect.gd")
 @export var damper := 4200.0
 @export var tire_grip := 1.2
 @export var nozzle_force := 10000.0
-@export var auto_landing_enabled := true
+@export var auto_landing_enabled := false
 const REST := 0.55
 const RADIUS := 0.36
 var fuel := 1.0
@@ -163,6 +163,7 @@ func _integrate_forces(state: PhysicsDirectBodyState3D) -> void:
 		wheels[i].get_node("WheelVisual").rotation.x = wheel_spin
 	wheel_spin -= speed / RADIUS * dt
 	var burst_requested := Input.is_action_pressed("burst")
+	var descending := contacts == 0 and state.linear_velocity.y < -0.25
 	var road_below := probe_landing(state)
 	var landing := Thrusters.landing_duty(landing_height, state.linear_velocity.y, up.dot(Vector3.UP), road_below, contacts, nozzle_force * 4 / mass) if auto_landing_enabled else 0.0
 	var pitch := Input.get_axis("pitch_back", "pitch_forward") if contacts == 0 else 0.0
@@ -174,10 +175,10 @@ func _integrate_forces(state: PhysicsDirectBodyState3D) -> void:
 	burning = false
 	for duty in nozzle_duties:
 		burning = burning or duty > 0.0001
-	jet_mode = "LIFT" if burst_requested else "LANDING BRAKE" if landing > 0 else "ATTITUDE" if burning else "READY"
+	jet_mode = ("DESCENT BRAKE" if descending else "LIFT") if burst_requested else "LANDING BRAKE" if landing > 0 else "ATTITUDE" if burning else "READY"
 	if not burning:
 		jet_mode = "LOW PRESSURE" if fuel <= 0.15 else "READY"
-	thrust_direction = (up + forward * 0.20).normalized() if burst_requested else up
+	thrust_direction = (up + forward * 0.20).normalized() if burst_requested and not descending else up
 	exhaust_hits.clear()
 	for i in Thrusters.NOZZLES.size():
 		var hit := {}

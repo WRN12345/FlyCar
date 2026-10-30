@@ -65,11 +65,13 @@ func capture() -> void:
 	car.reset_to(Transform3D(Basis.IDENTITY,Vector3(0,6,0)))
 	await frames(3)
 	car.linear_velocity = Vector3(0,-8,0)
+	Input.action_press("burst")
 	for i in 180:
 		await physics_frame
-		if car.jet_mode == "LANDING BRAKE" and car.position.y < 2.1:
+		if car.jet_mode == "DESCENT BRAKE" and car.position.y < 5.6:
 			break
-	await save_view("roadster-jets-landing.png", "LANDING BRAKE / 着陆缓冲喷射")
+	await save_view("roadster-jets-landing.png", "DESCENT BRAKE / Space 手动下落喷射")
+	Input.action_release("burst")
 	await frames(150)
 	await save_view("roadster-jets-touchdown.png", "TOUCHDOWN / 悬挂接地")
 	car.queue_free()
