@@ -6,6 +6,12 @@ Godot 4.7 物理赛车原型：Roadster 风格原创简化车型、四轮悬挂�
 
 ![上海高架飞行版](docs/images/gameplay.png)
 
+## 银灰 Roadster 外观
+
+参考用户提供的 Tesla Roadster 图片，重新制作低矮银灰车身、黑色溜背玻璃、独立轮拱、贯穿红色尾灯、后扩散器和五辐轮毂。模型为程序生成的原创简化版本；保留四轮物理悬挂、喷射和空中姿态控制。
+
+![银灰 Roadster](docs/images/roadster-silver.png)
+
 ## 启动与输入
 
 1. 在 **Godot 4.7.x 标准版**导入本目录 `project.godot`，按 **F5**。
@@ -61,6 +67,7 @@ Godot 4.7 物理赛车原型：Roadster 风格原创简化车型、四轮悬挂�
 
 ## 物理与代码
 
+- `scripts/roadster_visual.gd`：银灰车身网格、轮拱、灯组与独立旋转的轮毂；损毁碎片沿用车漆。
 - `scripts/car.gd`：RigidBody3D + 四轮射线弹簧/阻尼、接地点速度、摩擦圆、手刹和空气阻力；四个喷口分别施力，空中仅提供有限控制力矩。
 - `scripts/track_catalog.gd` / `tracks/*.json`：地图发现、验证、向心插值、等弧长采样与中心线平滑。
 - `scripts/course.gd` / `scripts/road_ribbon.gd`：共享截面的连续道路、路肩、路缘和护栏网格及碰撞；保留真实断桥。

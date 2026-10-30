@@ -1,5 +1,6 @@
 extends Node3D
 const Geo = preload("res://scripts/geometry.gd")
+const Visual = preload("res://scripts/roadster_visual.gd")
 var kind := "land"
 var impact_velocity := Vector3.ZERO
 var elapsed := 0.0
@@ -25,7 +26,7 @@ func add_part(mesh: Mesh, pos: Vector3, material: Material, velocity: Vector3) -
 	return part
 
 func build_wreck() -> void:
-	var red := Geo.material(Color("af273b"), 0.45)
+	var body_paint := Visual.paint()
 	var metal := Geo.material(Color("333e49"), 0.6)
 	var glass := Geo.material(Color("19394a"), 0.4)
 	# Hood, doors, roof and rear panels remain identifiable after impact.
@@ -33,7 +34,7 @@ func build_wreck() -> void:
 	for i in panels.size():
 		var mesh := BoxMesh.new()
 		mesh.size = panels[i][0]
-		add_part(mesh, panels[i][1], glass if i == 3 else red, throw_velocity(5.0))
+		add_part(mesh, panels[i][1], glass if i == 3 else body_paint, throw_velocity(5.0))
 	for x in [-0.95, 0.95]:
 		for z in [-1.35, 1.35]:
 			var tire := CylinderMesh.new()
@@ -45,7 +46,7 @@ func build_wreck() -> void:
 	for i in 20:
 		var mesh := BoxMesh.new()
 		mesh.size = Vector3(rng.randf_range(0.07, 0.2), 0.08, rng.randf_range(0.1, 0.35))
-		add_part(mesh, Vector3(0, 0.4, 0), metal if i % 2 else red, throw_velocity(9.0))
+		add_part(mesh, Vector3(0, 0.4, 0), metal if i % 2 else body_paint, throw_velocity(9.0))
 
 func throw_velocity(strength: float) -> Vector3:
 	return Vector3(impact_velocity.x, 0, impact_velocity.z) * 0.25 + Vector3(rng.randf_range(-strength, strength), rng.randf_range(2, strength), rng.randf_range(-strength, strength))

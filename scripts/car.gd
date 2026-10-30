@@ -2,6 +2,7 @@ extends RigidBody3D
 
 const Geo = preload("res://scripts/geometry.gd")
 const Model = preload("res://scripts/vehicle_math.gd")
+const Visual = preload("res://scripts/roadster_visual.gd")
 
 @export var spring_rate := 42000.0
 @export var damper := 4200.0
@@ -47,8 +48,7 @@ func _ready() -> void:
 	collision.shape = shape
 	collision.position.y = 0.16
 	add_child(collision)
-	Geo.car_shell(self)
-	var tire := Geo.material(Color("10141b"))
+	Visual.build(self)
 	var rim := Geo.material(Color("97a6b3"), 0.9)
 	var jet_mat := Geo.material(Color("85e5ff"), 0.0, 3.0)
 	for z in [-1.36, 1.36]:
@@ -63,10 +63,7 @@ func _ready() -> void:
 			wheel.position = ray.position - Vector3.UP * REST
 			add_child(wheel)
 			wheels.append(wheel)
-			var rubber := Geo.cylinder(wheel, RADIUS, 0.29, Vector3.ZERO, tire)
-			rubber.rotation.z = PI / 2
-			var metal := Geo.cylinder(wheel, 0.265, 0.305, Vector3.ZERO, rim)
-			metal.rotation.z = PI / 2
+			Visual.build_wheel(wheel, signf(x), RADIUS)
 			Geo.cylinder(self, 0.10, 0.12, Vector3(x * 0.68, -0.19, z * 0.70), rim)
 			var jet_mesh := CylinderMesh.new()
 			jet_mesh.top_radius = 0.07
@@ -128,7 +125,7 @@ func _integrate_forces(state: PhysicsDirectBodyState3D) -> void:
 			state.apply_force(side * tire_force.x + wheel_forward * tire_force.y, offset)
 		wheels[i].position = ray.position - Vector3.UP * length
 		wheels[i].rotation.y = steering if i < 2 else 0.0
-		wheels[i].get_child(0).rotation.x = wheel_spin
+		wheels[i].get_node("WheelVisual").rotation.x = wheel_spin
 	wheel_spin -= speed / RADIUS * dt
 	var burst_requested := Input.is_action_pressed("burst")
 	burning = burst_requested and fuel > 0.0001
