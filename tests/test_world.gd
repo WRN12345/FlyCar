@@ -7,7 +7,7 @@ func check(ok: bool, message: String) -> void:
 func _initialize() -> void:
 	call_deferred("run")
 func run() -> void:
-	var packed = load("res://main.tscn")
+	var packed = load("res://tests/fixtures/legacy_world.tscn")
 	if packed == null:
 		push_error("FAIL: playable circuit not implemented")
 		quit(1)

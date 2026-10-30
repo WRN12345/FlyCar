@@ -14,7 +14,7 @@ func frames(n: int) -> void:
 		await physics_frame
 
 func run() -> void:
-	var world = load("res://main.tscn").instantiate()
+	var world = load("res://tests/fixtures/legacy_world.tscn").instantiate()
 	root.add_child(world)
 	world.countdown = 0.0
 	world.car.freeze = false
