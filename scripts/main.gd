@@ -6,6 +6,7 @@ const Race = preload("res://scripts/race_state.gd")
 const Map = preload("res://scripts/minimap.gd")
 const Catalog = preload("res://scripts/track_catalog.gd")
 const Course = preload("res://scripts/course.gd")
+const OffroadCourse = preload("res://scripts/offroad_course.gd")
 const Menu = preload("res://scripts/track_menu.gd")
 const Impact = preload("res://scripts/impact_effect.gd")
 var car: RigidBody3D
@@ -73,7 +74,12 @@ func _ready() -> void:
 		banner.text = "未找到有效地图数据 / tracks/*.json"
 		car.freeze = true
 		return
-	switch_track(0)
+	var preferred := 0
+	for i in tracks.size():
+		if tracks[i].get("mode","") == "offroad":
+			preferred = i
+			break
+	switch_track(preferred)
 	has_started = false
 	open_maps()
 
@@ -126,9 +132,11 @@ func switch_track(index: int) -> void:
 	if is_instance_valid(course):
 		remove_child(course)
 		course.queue_free()
-	course = Course.new()
+	var offroad: bool = tracks[index].get("mode","") == "offroad"
+	course = OffroadCourse.new() if offroad else Course.new()
 	add_child(course)
 	course.build(tracks[index])
+	car.surface_provider = course.terrain if offroad else null
 	course.gate_entered.connect(_gate_entered)
 	active_index = index
 	has_started = true
@@ -146,8 +154,9 @@ func switch_track(index: int) -> void:
 	menu.close()
 	map.points = route
 	map.gates = gates
+	map.shortcut_lines = course.shortcuts if offroad else []
 	map.route_color = Color(tracks[index].color)
-	hud_course.text = tracks[index].name + " · 飞行改编版"
+	hud_course.text = tracks[index].name + (" · 多地形越野计时" if offroad else " · 飞行改编版")
 	hud_map_title.text = "CIRCUIT / %.2f KM" % (course.length / 1000)
 	var forward := -recovery_pose.basis.z
 	camera.position = recovery_pose.origin - forward * 10.5 + Vector3.UP * 4.1
@@ -203,8 +212,11 @@ func _gate_entered(body: Node3D, index: int) -> void:
 	if body != car or countdown > 0 or death_remaining > 0:
 		return
 	if race.pass_gate(index, car.linear_velocity.dot(-gates[index].basis.z) > 0.5):
-		recovery_pose = course.pose_at(course.length * index / gates.size() + 7.0)
-		recovery_pose.origin += Vector3.UP * 0.9
+		if course.has_method("recovery_at_gate"):
+			recovery_pose = course.recovery_at_gate(index)
+		else:
+			recovery_pose = course.pose_at(course.length * index / gates.size() + 7.0)
+			recovery_pose.origin += Vector3.UP * 0.9
 		if race.finished:
 			save_record(race.elapsed)
 			show_result()
@@ -409,9 +421,17 @@ func _physics_process(dt: float) -> void:
 		if not race.finished:
 			race.elapsed += dt
 		var surface: Dictionary = course.terrain.surface_at(car.position)
-		var at_surface: bool = car.position.y <= surface.height + 0.15 if surface.kind == "water" else car.lowest_chassis_y() <= surface.height + 0.06
-		if at_surface and car.linear_velocity.y <= 0.1:
-			begin_surface_impact(surface)
+		if tracks[active_index].get("mode","") == "offroad":
+			if surface.kind == "water" and car.position.y <= surface.water_height+0.15 and car.linear_velocity.y <= 0.1:
+				surface.height = surface.water_height
+				begin_surface_impact(surface)
+			elif car.severe_impact_speed >= 12.0 or car.position.y < -40:
+				surface.kind = "land"
+				begin_surface_impact(surface)
+		else:
+			var at_surface: bool = car.position.y <= surface.height + 0.15 if surface.kind == "water" else car.lowest_chassis_y() <= surface.height + 0.06
+			if at_surface and car.linear_velocity.y <= 0.1:
+				begin_surface_impact(surface)
 		if message_time > 0:
 			message_time -= dt
 			if message_time <= 0 and not race.finished and death_remaining <= 0:
@@ -445,6 +465,11 @@ func _process(dt: float) -> void:
 		hud_hint.text = "WASD 驾驶 · Space 短喷 · M 切换地图 · 记得在 Godot 窗口顶部选择“输入”"
 	elif car.global_basis.y.dot(Vector3.UP) < 0.2 and car.linear_velocity.length() < 3:
 		hud_hint.text = "车辆侧翻 · 按 R 返回检查点（+3秒）"
+	elif tracks[active_index].get("mode","") == "offroad":
+		hud_hint.text = "%s · 旗帜指引主路 / 黄色旗帜为捷径 · 下落按 Space 减速" % (car.surface_label if car.contacts>0 else "腾空 · 方向键调姿态")
+		for cut in course.shortcuts:
+			if car.position.distance_to(cut.points[0]) < 70:
+				hud_hint.text = "峡谷捷径：距沟边约 %dm · 约70km/h+，起飞短喷后留气下落补喷 · 主路可绕行" % roundi(maxf(0,-446-car.position.z)) if cut.entry_gate==5 else "草坡捷径 · 控速横切，注意侧翻 · 检查点仍需顺序通过"
 	elif car.position.distance_to(course.barrier_pose.origin) < 55:
 		hud_hint.text = "前方实体路障 · 保持车速，短按 Space 约 0.4–0.5 秒"
 	elif car.position.distance_to(course.gap_pose.origin) < 70:

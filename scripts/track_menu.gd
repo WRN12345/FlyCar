@@ -28,9 +28,9 @@ func build(tracks: Array) -> void:
 	var stack := VBoxContainer.new()
 	stack.add_theme_constant_override("separation", 14)
 	center.add_child(stack)
-	text_label(stack, "FLYCAR   /   CHINA SERIES", 15, Color("b5ec67"))
+	text_label(stack, "FLYCAR   /   TERRAIN & FLIGHT", 15, Color("b5ec67"))
 	text_label(stack, "选择你的下一条赛道", 38)
-	text_label(stack, "参考真实布局 · 高架飞行改编版    /    三条路线，三种节奏", 16, Color("9cb6bd"))
+	text_label(stack, "山谷越野 · 多地形与双捷径    /    经典中国高架赛道", 16, Color("9cb6bd"))
 	var cards := HBoxContainer.new()
 	cards.add_theme_constant_override("separation", 20)
 	var scroll := ScrollContainer.new()
@@ -38,7 +38,9 @@ func build(tracks: Array) -> void:
 	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	stack.add_child(scroll)
 	scroll.add_child(cards)
-	for i in tracks.size():
+	var order := range(tracks.size())
+	order.sort_custom(func(a,b): return tracks[a].get("mode","")=="offroad" and tracks[b].get("mode","")!="offroad")
+	for i in order:
 		var data: Dictionary = tracks[i]
 		var card := PanelContainer.new()
 		card.custom_minimum_size = Vector2(370, 400)
@@ -56,7 +58,8 @@ func build(tracks: Array) -> void:
 		var content := VBoxContainer.new()
 		content.add_theme_constant_override("separation", 12)
 		card.add_child(content)
-		text_label(content, "CHINA  /  %02d" % (i + 1), 12, Color(data.color))
+		var offroad: bool = data.get("mode","")=="offroad"
+		text_label(content, "OFF-ROAD / TIME TRIAL" if offroad else "CHINA  /  %02d" % (i + 1), 12, Color(data.color))
 		text_label(content, data.name, 24)
 		text_label(content, data.subtitle, 14, Color("b0c2c7"))
 		var preview := Preview.new()
@@ -65,14 +68,14 @@ func build(tracks: Array) -> void:
 		preview.points = Catalog.sample(data)
 		preview.route_color = Color(data.color)
 		content.add_child(preview)
-		text_label(content, "飞行改编 %.2f km  /  原赛道 %.3f km" % [Catalog.length_of(preview.points) / 1000, data.reference_km], 12, Color("93aeb8"))
+		text_label(content, "越野 %.2f km / 8 检查点 / 2 捷径" % (Catalog.length_of(preview.points)/1000) if offroad else "飞行改编 %.2f km  /  原赛道 %.3f km" % [Catalog.length_of(preview.points) / 1000, data.reference_km], 12, Color("93aeb8"))
 		var button := Button.new()
 		button.text = "进入赛道  →"
 		button.custom_minimum_size.y = 48
 		button.add_theme_font_size_override("font_size", 18)
 		content.add_child(button)
 		button.pressed.connect(func(): selected.emit(i))
-	text_label(stack, "WASD 驾驶   /   SPACE 短喷越障   /   M 切换地图   /   落海沉没 · 落地碎裂", 14, Color("9cb6bd"))
+	text_label(stack, "WASD 驾驶 / SPACE 起飞与下落减速 / M 地图 / 越野：正常接地安全，重撞碎裂", 14, Color("9cb6bd"))
 	cancel_button = Button.new()
 	cancel_button.text = "返回比赛  [Esc]"
 	cancel_button.custom_minimum_size.y = 38

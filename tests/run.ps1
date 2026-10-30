@@ -12,7 +12,9 @@ function Invoke-Check([string]$Name, [string[]]$Arguments) {
     }
 }
 Invoke-Check 'import' @('--editor', '--import')
-foreach ($name in @('math', 'physics', 'race', 'world', 'obstacles', 'catalog', 'china', 'china_obstacles', 'surfaces', 'road_corners', 'car_visual', 'jets', 'landing', 'jet_effects')) {
+foreach ($name in @('math', 'physics', 'race', 'world', 'obstacles', 'catalog', 'china', 'china_obstacles', 'surfaces', 'road_corners', 'car_visual', 'jets', 'landing', 'jet_effects', 'offroad_model', 'offroad', 'offroad_drive')) {
     Invoke-Check $name @('--script', "tests/test_$name.gd")
 }
+Invoke-Check 'offroad_lap' @('--fixed-fps','120','--script','tests/test_offroad_lap.gd')
+Invoke-Check 'offroad_shortcuts' @('--fixed-fps','120','--script','tests/test_offroad_shortcuts.gd')
 Write-Output 'PASS: all FlyCar checks completed.'

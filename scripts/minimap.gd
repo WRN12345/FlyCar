@@ -15,6 +15,7 @@ var vehicle: Node3D
 var gates: Array[Transform3D] = []
 var next_gate := 1
 var route_color := Color("7797a7")
+var shortcut_lines: Array = []
 
 func project(p: Vector3) -> Vector2:
 	if points.is_empty():
@@ -32,6 +33,9 @@ func _draw() -> void:
 	line.append(project(points[0]))
 	draw_polyline(line, route_color.darkened(0.65), 6, true)
 	draw_polyline(line, route_color, 2, true)
+	for cut in shortcut_lines:
+		for i in range(cut.points.size()-1):
+			draw_dashed_line(project(cut.points[i]),project(cut.points[i+1]),Color("f4c477"),2,4)
 	for i in gates.size():
 		draw_circle(project(gates[i].origin), 4 if i == next_gate else 2, Color("b6f56c") if i == next_gate else Color("647e8b"))
 	if is_instance_valid(vehicle):

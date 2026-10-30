@@ -5,6 +5,7 @@ const Model = preload("res://scripts/vehicle_math.gd")
 const Visual = preload("res://scripts/roadster_visual.gd")
 const Thrusters = preload("res://scripts/thruster_control.gd")
 const JetEffect = preload("res://scripts/jet_effect.gd")
+const SurfaceEffect = preload("res://scripts/surface_effect.gd")
 
 @export var spring_rate := 42000.0
 @export var damper := 4200.0
@@ -31,6 +32,10 @@ var exhaust_hits: Array[Dictionary] = []
 var jet_mode := "READY"
 var landing_height := INF
 var thrust_direction := Vector3.UP
+var surface_provider: Node3D
+var surface_label := ""
+var severe_impact_speed := 0.0
+var surface_effect: Node3D
 
 static func configure_inputs() -> void:
 	var keys := {"throttle": KEY_W, "brake": KEY_S, "steer_left": KEY_A, "steer_right": KEY_D, "burst": KEY_SPACE, "pitch_forward": KEY_UP, "pitch_back": KEY_DOWN, "roll_left": KEY_LEFT, "roll_right": KEY_RIGHT, "recover": KEY_R, "restart": KEY_ENTER, "pause": KEY_ESCAPE, "handbrake": KEY_SHIFT}
@@ -50,6 +55,8 @@ func _ready() -> void:
 	linear_damp = 0.04
 	angular_damp = 0.45
 	can_sleep = false
+	max_contacts_reported = 8
+	contact_monitor = true
 	var collision := CollisionShape3D.new()
 	chassis_collision = collision
 	var shape := BoxShape3D.new()
@@ -75,11 +82,14 @@ func _ready() -> void:
 			Geo.cylinder(self, 0.10, 0.12, Vector3(x * 0.68, -0.19, z * 0.70), rim)
 	jet_effect = JetEffect.new()
 	add_child(jet_effect)
+	surface_effect = SurfaceEffect.new()
+	add_child(surface_effect)
 
 func _process(_dt: float) -> void:
 	if freeze or pending_reset or not visible:
 		clear_jets()
 	jet_effect.update_output(self)
+	surface_effect.update_output(self)
 
 func reset_to(pose: Transform3D) -> void:
 	reset_pose = pose
@@ -95,6 +105,8 @@ func clear_jets() -> void:
 	landing_height = INF
 	if is_instance_valid(jet_effect):
 		jet_effect.clear()
+	if is_instance_valid(surface_effect):
+		surface_effect.clear()
 
 func probe_landing(state: PhysicsDirectBodyState3D) -> bool:
 	nozzle_hits.clear()
@@ -126,11 +138,20 @@ func _integrate_forces(state: PhysicsDirectBodyState3D) -> void:
 		steering = 0.0
 		burning = false
 		recharge_delay = 0.8
+		severe_impact_speed = 0
 		return
 	var dt := state.step
 	var up := state.transform.basis.y
 	var forward := -state.transform.basis.z
 	var speed := state.linear_velocity.dot(forward)
+	severe_impact_speed = 0
+	if is_instance_valid(surface_provider):
+		for i in state.get_contact_count():
+			# Jolt reports world-space contact normals and pre-impact point velocities.
+			var normal := state.get_contact_local_normal(i)
+			var velocity := state.get_contact_local_velocity_at_position(i)-state.get_contact_collider_velocity_at_position(i)
+			severe_impact_speed = maxf(severe_impact_speed,-velocity.dot(normal))
+	surface_label = ""
 	var steer_input := Input.get_axis("steer_right", "steer_left")
 	steering = move_toward(steering, steer_input * lerpf(0.48, 0.16, clampf(absf(speed) / 65.0, 0, 1)), dt * 1.8)
 	var throttle := Input.get_action_strength("throttle")
@@ -150,13 +171,21 @@ func _integrate_forces(state: PhysicsDirectBodyState3D) -> void:
 			length = clampf(ray.global_position.distance_to(hit) - RADIUS, 0.03, REST)
 			var offset := hit - state.transform.origin
 			var velocity := state.linear_velocity + state.angular_velocity.cross(offset - state.transform.basis * center_of_mass)
+			var surface_grip := 1.0
+			var rolling := 9.0
+			if is_instance_valid(surface_provider):
+				var surface: Dictionary = surface_provider.surface_at(hit)
+				surface_grip = surface.grip
+				rolling = surface.rolling
+				surface_label = surface.label
+				severe_impact_speed = maxf(severe_impact_speed,-velocity.dot(normal))
 			var load_n := clampf((REST - length) * spring_rate - velocity.dot(up) * damper, 0.0, 28000.0)
 			state.apply_force(up * load_n, offset)
 			var wheel_forward := forward.rotated(up, steering if i < 2 else 0.0)
 			wheel_forward = wheel_forward.slide(normal).normalized()
 			var side := wheel_forward.cross(normal).normalized()
-			var grip := tire_grip * (0.48 if i >= 2 and Input.is_action_pressed("handbrake") else 1.0)
-			var tire_force := Model.tire_force(load_n, velocity.dot(side), velocity.dot(wheel_forward), throttle, maxf(brake, Input.get_action_strength("handbrake") if i >= 2 else 0.0), grip)
+			var grip := tire_grip * surface_grip * (0.48 if i >= 2 and Input.is_action_pressed("handbrake") else 1.0)
+			var tire_force := Model.tire_force(load_n, velocity.dot(side), velocity.dot(wheel_forward), throttle, maxf(brake, Input.get_action_strength("handbrake") if i >= 2 else 0.0), grip, rolling)
 			state.apply_force(side * tire_force.x + wheel_forward * tire_force.y, offset)
 		wheels[i].position = ray.position - Vector3.UP * length
 		wheels[i].rotation.y = steering if i < 2 else 0.0

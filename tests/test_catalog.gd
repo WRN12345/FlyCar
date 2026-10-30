@@ -11,6 +11,7 @@ func _initialize() -> void:
 		quit(1)
 		return
 	var tracks: Array = catalog.load_tracks()
+	tracks = tracks.filter(func(data): return data.get("mode","")!="offroad")
 	check(tracks.size() == 3, "three Chinese tracks discovered from JSON")
 	var lengths: Array = []
 	for data in tracks:

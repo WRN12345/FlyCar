@@ -1,4 +1,5 @@
 extends RefCounted
+const Offroad = preload("res://scripts/offroad_model.gd")
 ## Original manually interpreted centerlines; publicly referenced diagrams are not bundled.
 const BASE_HEIGHT := 32.0
 
@@ -47,6 +48,38 @@ static func valid(data: Variant) -> bool:
 					return false
 			if region.rect[2] <= region.rect[0] or region.rect[3] <= region.rect[1]:
 				return false
+	if data.get("mode","") not in ["","offroad"]:
+		return false
+	if data.get("mode","") == "offroad":
+		if not data.get("checkpoint_anchors") is Array or data.checkpoint_anchors.size()!=8:
+			return false
+		for p in data.points + data.checkpoint_anchors:
+			if not p is Array or p.size()!=2:
+				return false
+			for value in p:
+				if not (value is float or value is int) or not is_finite(float(value)):
+					return false
+			if not Offroad.BOUNDS.grow(-30).has_point(Vector2(p[0],p[1])):
+				return false
+		var previous := -40.0
+		for anchor in data.checkpoint_anchors:
+			var target := Vector2(anchor[0],anchor[1])
+			var best := INF
+			var progress := 0.0
+			var distance := 0.0
+			for i in data.points.size():
+				var a := Vector2(data.points[i][0],data.points[i][1])
+				var b := Vector2(data.points[(i+1)%data.points.size()][0],data.points[(i+1)%data.points.size()][1])
+				var delta := b-a
+				var t := clampf((target-a).dot(delta)/delta.length_squared(),0,1)
+				var error := target.distance_squared_to(a+delta*t)
+				if error<best:
+					best=error
+					progress=distance+delta.length()*t
+				distance+=delta.length()
+			if best>900 or progress<previous+30:
+				return false
+			previous=progress
 	return true
 
 static func load_tracks() -> Array:
@@ -63,6 +96,8 @@ static func load_tracks() -> Array:
 	return result
 
 static func world_point(data: Dictionary, p: Array) -> Vector3:
+	if data.get("mode","") == "offroad":
+		return Vector3(p[0],Offroad.height_at(p[0],p[1]),p[1])
 	var origin: Array = data.points[0]
 	var initial := Vector3(data.points[1][0] - origin[0], 0, data.points[1][1] - origin[1])
 	var yaw := -Basis.looking_at(initial.normalized()).get_euler().y
@@ -98,6 +133,9 @@ static func sample(data: Dictionary) -> Array[Vector3]:
 			sum += uniform[posmod(i + offset, uniform.size())] * weight
 			weight_sum += weight
 		smooth.append(sum / weight_sum)
+	if data.get("mode","") == "offroad":
+		for i in smooth.size():
+			smooth[i].y = Offroad.height_at(smooth[i].x,smooth[i].z)
 	return smooth
 
 static func centripetal(a: Vector3, b: Vector3, c: Vector3, d: Vector3, u: float) -> Vector3:
