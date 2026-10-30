@@ -3,6 +3,8 @@ extends Node3D
 signal gate_entered(body: Node3D, index: int)
 const Geo = preload("res://scripts/geometry.gd")
 const Catalog = preload("res://scripts/track_catalog.gd")
+const Terrain = preload("res://scripts/terrain.gd")
+var terrain: Node3D
 var data: Dictionary
 var route: Array[Vector3] = []
 var gates: Array[Transform3D] = []
@@ -22,6 +24,9 @@ func build(definition: Dictionary) -> void:
 	data = definition
 	name = "ActiveCourse"
 	route = Catalog.sample(data)
+	terrain = Terrain.new()
+	add_child(terrain)
+	terrain.build(data, route)
 	for i in route.size():
 		distances.append(length)
 		length += route[i].distance_to(route[(i + 1) % route.size()])
@@ -56,12 +61,12 @@ func build(definition: Dictionary) -> void:
 		add_box(Vector3(20, 0.7, segment + 0.18), center - Vector3.UP * 0.35, basis, "shoulder", true)
 		add_box(Vector3(18, 0.035, segment + 0.2), center + Vector3.UP * 0.02, basis, "asphalt")
 		for side in [-1.0, 1.0]:
-			add_box(Vector3(0.13, 0.04, segment + 0.2), center + basis.x * side * 8.45 + Vector3.UP * 0.045, basis, "edge")
+			add_box(Vector3(0.18, 0.04, segment + 0.2), center + basis.x * side * 8.45 + Vector3.UP * 0.045, basis, "edge")
 			add_box(Vector3(0.65, 0.08, segment + 0.2), center + basis.x * side * 9.1 + Vector3.UP * 0.04, basis, "accent" if i % 2 else "white")
 			# Low guards do not prevent a misjudged airborne exit.
 			add_box(Vector3(0.22, 0.45, segment + 0.2), center + basis.x * side * 9.85 + Vector3.UP * 0.23, basis, "dark", true)
 		if i % 2 == 0:
-			add_box(Vector3(0.12, 0.04, segment * 0.5), center + Vector3.UP * 0.045, basis, "edge")
+			add_box(Vector3(0.18, 0.04, segment * 0.5), center + Vector3.UP * 0.045, basis, "edge")
 		if i % 20 == 0:
 			add_box(Vector3(2.5, center.y, 2.5), Vector3(center.x, center.y / 2 - 0.8, center.z), Basis.IDENTITY, "dark")
 		if i % 24 == 0:

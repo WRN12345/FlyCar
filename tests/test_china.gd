@@ -52,28 +52,28 @@ func run() -> void:
 	check(paused, "cancel preserves pre-existing pause")
 	paused = false
 	world.car.fuel = 0.25
-	world.car.reset_to(Transform3D(Basis.IDENTITY, world.course.spawn.origin - Vector3.UP * 12))
+	world.car.reset_to(Transform3D(Basis.IDENTITY, Vector3(world.course.spawn.origin.x, world.course.terrain.surface_at(world.course.spawn.origin).height + 0.1, world.course.spawn.origin.z)))
 	await frames(4)
-	check(world.death_remaining > 0 and not world.car.visible, "fall triggers explosion and hides car")
+	check(world.death_remaining > 0 and world.car.visible, "water contact starts sinking")
 	var penalty_count: int = world.race.recoveries
 	world.recover()
-	check(world.race.recoveries == penalty_count, "R cannot bypass active explosion")
+	check(world.race.recoveries == penalty_count, "R cannot bypass active surface impact")
 	paused = true
 	var remaining: float = world.death_remaining
 	await frames(20)
-	check(world.death_remaining == remaining, "pause suspends explosion countdown")
+	check(world.death_remaining == remaining, "pause suspends surface impact countdown")
 	paused = false
-	await frames(210)
-	check(world.death_remaining == 0 and world.car.visible and world.race.recoveries == penalty_count + 1, "explosion recovers once")
-	check(world.car.fuel < 0.35, "explosion does not refill tank")
-	world.car.reset_to(Transform3D(Basis.IDENTITY, world.course.spawn.origin - Vector3.UP * 12))
+	await frames(330)
+	check(world.death_remaining == 0 and world.car.visible and world.race.recoveries == penalty_count + 1, "surface impact recovers once")
+	check(world.car.fuel < 0.35, "surface impact does not refill tank")
+	world.car.reset_to(Transform3D(Basis.IDENTITY, Vector3(world.course.spawn.origin.x, world.course.terrain.surface_at(world.course.spawn.origin).height + 0.1, world.course.spawn.origin.z)))
 	await frames(4)
 	world.restart_race()
 	await frames(240)
-	check(world.race.recoveries == 0 and world.death_remaining == 0 and world.car.visible, "restart cancels stale explosion")
+	check(world.race.recoveries == 0 and world.death_remaining == 0 and world.car.visible, "restart cancels stale surface impact")
 	world.countdown = 0
 	world.car.freeze = false
-	world.car.reset_to(Transform3D(Basis.IDENTITY, world.course.spawn.origin - Vector3.UP * 12))
+	world.car.reset_to(Transform3D(Basis.IDENTITY, Vector3(world.course.spawn.origin.x, world.course.terrain.surface_at(world.course.spawn.origin).height + 0.1, world.course.spawn.origin.z)))
 	await frames(4)
 	await process_frame
 	world.switch_track(0)
@@ -104,7 +104,7 @@ func run() -> void:
 	world.car.freeze = false
 	world.car.reset_to(Transform3D(Basis.IDENTITY, world.course.spawn.origin + Vector3.UP * 20))
 	await frames(4)
-	check(world.death_remaining == 0 and world.car.visible, "normal airborne height never triggers explosion")
+	check(world.death_remaining == 0 and world.car.visible, "normal airborne height never triggers surface impact")
 	var fits := true
 	for point in world.route:
 		var p: Vector2 = world.map.project(point)

@@ -7,7 +7,7 @@ const Map = preload("res://scripts/minimap.gd")
 const Catalog = preload("res://scripts/track_catalog.gd")
 const Course = preload("res://scripts/course.gd")
 const Menu = preload("res://scripts/track_menu.gd")
-const Blast = preload("res://scripts/explosion.gd")
+const Impact = preload("res://scripts/impact_effect.gd")
 var car: RigidBody3D
 var camera: Camera3D
 var course: Node3D
@@ -35,7 +35,11 @@ var message_time := 0.0
 var best_time := 0.0
 var best_times: Dictionary = {}
 var death_remaining := 0.0
-var explosion: Node3D
+var impact_effect: Node3D
+var impact_kind := ""
+var impact_duration := 0.0
+var sink_origin := Vector3.ZERO
+var sink_basis := Basis.IDENTITY
 var record_path := "user://flycar.cfg"
 
 func _ready() -> void:
@@ -101,7 +105,6 @@ func build_environment() -> void:
 	sun.shadow_enabled = true
 	sun.directional_shadow_max_distance = 170
 	add_child(sun)
-	Geo.box(self, Vector3(6000, 1, 6000), Vector3(0, -1, 0), Geo.material(Color("254b55"), 0.35))
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 321
 	for i in 40:
@@ -119,7 +122,7 @@ func switch_track(index: int) -> void:
 	if index < 0 or index >= tracks.size():
 		return
 	get_tree().paused = false
-	clear_explosion()
+	clear_impact()
 	if is_instance_valid(course):
 		remove_child(course)
 		course.queue_free()
@@ -163,22 +166,37 @@ func close_maps() -> void:
 	menu.close()
 	get_tree().paused = menu_was_paused
 
-func clear_explosion() -> void:
+func clear_impact() -> void:
 	death_remaining = 0.0
-	if is_instance_valid(explosion):
-		explosion.queue_free()
-	explosion = null
+	impact_kind = ""
+	impact_duration = 0.0
+	if is_instance_valid(impact_effect):
+		impact_effect.queue_free()
+	impact_effect = null
 
-func begin_explosion() -> void:
-	if death_remaining > 0 or countdown > 0:
+func begin_surface_impact(surface: Dictionary) -> void:
+	if death_remaining > 0 or countdown > 0 or car.pending_reset:
 		return
-	death_remaining = 1.6
+	impact_kind = surface.kind
+	impact_duration = 2.4 if impact_kind == "water" else 1.6
+	death_remaining = impact_duration
+	var velocity := car.linear_velocity
 	car.freeze = true
-	car.visible = false
-	explosion = Blast.new()
-	add_child(explosion)
-	explosion.global_position = car.global_position
-	banner.text = "VEHICLE DESTROYED\n车辆爆炸 · 即将返回检查点"
+	car.visible = impact_kind == "water"
+	sink_origin = Vector3(car.position.x, surface.height + 0.15, car.position.z)
+	sink_basis = car.basis
+	impact_effect = Impact.new()
+	impact_effect.kind = impact_kind
+	impact_effect.impact_velocity = velocity
+	add_child(impact_effect)
+	impact_effect.global_position = Vector3(car.position.x, surface.height, car.position.z)
+	impact_effect.rotation.y = car.rotation.y
+	var forward := -car.basis.z
+	forward.y = 0
+	forward = forward.normalized() if forward.length() > 0.1 else Vector3.FORWARD
+	camera.position = impact_effect.position - forward * 9 + Vector3.UP * 5
+	camera.look_at(impact_effect.position + Vector3.UP * 0.4)
+	banner.text = "VEHICLE SUBMERGING\n落水 · 车辆正在下沉" if impact_kind == "water" else "VEHICLE WRECKED\n撞击地面 · 车身碎裂"
 
 func _gate_entered(body: Node3D, index: int) -> void:
 	if body != car or countdown > 0 or death_remaining > 0:
@@ -327,7 +345,7 @@ func recover() -> void:
 func restart_race() -> void:
 	if active_index < 0:
 		return
-	clear_explosion()
+	clear_impact()
 	get_tree().paused = false
 	menu.close()
 	race.restart()
@@ -352,7 +370,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		if get_tree().paused:
 			banner.text = "PAUSED\nESC 继续 / M 选择地图"
 		elif death_remaining > 0:
-			banner.text = "VEHICLE DESTROYED\n车辆爆炸 · 即将返回检查点"
+			banner.text = "VEHICLE SUBMERGING\n落水 · 车辆正在下沉" if impact_kind == "water" else "VEHICLE WRECKED\n撞击地面 · 车身碎裂"
 		elif race.finished:
 			show_result()
 		else:
@@ -369,8 +387,12 @@ func _physics_process(dt: float) -> void:
 		if not race.finished:
 			race.elapsed += dt
 		death_remaining = maxf(0, death_remaining - dt)
+		if impact_kind == "water":
+			var progress := 1 - death_remaining / impact_duration
+			car.position = sink_origin - Vector3.UP * progress * 3.6
+			car.basis = sink_basis * Basis(Vector3.FORWARD, progress * 0.28)
 		if death_remaining <= 0:
-			clear_explosion()
+			clear_impact()
 			recover()
 		return
 	if countdown > 0:
@@ -385,8 +407,10 @@ func _physics_process(dt: float) -> void:
 	else:
 		if not race.finished:
 			race.elapsed += dt
-		if car.position.y < course.road_height_at(car.position) - 8:
-			begin_explosion()
+		var surface: Dictionary = course.terrain.surface_at(car.position)
+		var at_surface: bool = car.position.y <= surface.height + 0.15 if surface.kind == "water" else car.lowest_chassis_y() <= surface.height + 0.06
+		if at_surface and car.linear_velocity.y <= 0.1:
+			begin_surface_impact(surface)
 		if message_time > 0:
 			message_time -= dt
 			if message_time <= 0 and not race.finished and death_remaining <= 0:
@@ -415,7 +439,7 @@ func _process(dt: float) -> void:
 	for i in course.gate_lights.size():
 		course.gate_lights[i].material_override = course.selected if i == race.next_gate else course.accent
 	if death_remaining > 0:
-		hud_hint.text = "车辆已损毁 · 正在返回检查点 · 追加 3 秒罚时"
+		hud_hint.text = "车辆正在沉入水中 · 随后返回检查点（+3秒）" if impact_kind == "water" else "车辆撞击地面碎裂 · 随后返回检查点（+3秒）"
 	elif countdown > 0:
 		hud_hint.text = "WASD 驾驶 · Space 短喷 · M 切换地图 · 记得在 Godot 窗口顶部选择“输入”"
 	elif car.global_basis.y.dot(Vector3.UP) < 0.2 and car.linear_velocity.length() < 3:
@@ -425,6 +449,6 @@ func _process(dt: float) -> void:
 	elif car.position.distance_to(course.gap_pose.origin) < 70:
 		hud_hint.text = "前方 25m 断桥 · 提前短喷约 0.6–0.7 秒 · 注意落点"
 	elif car.contacts == 0:
-		hud_hint.text = "AIRBORNE · ↑↓ 俯仰 / ←→ 侧倾 · 掉到赛道下方会爆炸"
+		hud_hint.text = "AIRBORNE · ↑↓ 俯仰 / ←→ 侧倾 · 留意落点：水面沉没，陆地撞击碎裂"
 	else:
 		hud_hint.text = "真实悬挂 / 短时喷射    ·    M 地图菜单    ·    请留意前方绿色起飞提示"

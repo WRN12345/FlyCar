@@ -72,7 +72,7 @@ func build(tracks: Array) -> void:
 		button.add_theme_font_size_override("font_size", 18)
 		content.add_child(button)
 		button.pressed.connect(func(): selected.emit(i))
-	text_label(stack, "WASD 驾驶   /   SPACE 短喷越障   /   M 切换地图   /   掉落爆炸后检查点重生", 14, Color("9cb6bd"))
+	text_label(stack, "WASD 驾驶   /   SPACE 短喷越障   /   M 切换地图   /   落海沉没 · 落地碎裂", 14, Color("9cb6bd"))
 	cancel_button = Button.new()
 	cancel_button.text = "返回比赛  [Esc]"
 	cancel_button.custom_minimum_size.y = 38

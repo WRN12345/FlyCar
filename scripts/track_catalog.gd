@@ -35,6 +35,18 @@ static func valid(data: Variant) -> bool:
 		perimeter += distance
 	if perimeter < 1000 or perimeter > 10000 or data.barrier_distance < 50 or data.barrier_distance > perimeter - 50:
 		return false
+	if data.has("terrain"):
+		var terrain_data = data.terrain
+		if not terrain_data is Dictionary or not terrain_data.get("base") in ["land", "water"] or not terrain_data.get("regions") is Array or terrain_data.regions.size() > 8:
+			return false
+		for region in terrain_data.regions:
+			if not region is Dictionary or not region.get("kind") in ["land", "water"] or not region.get("rect") is Array or region.rect.size() != 4:
+				return false
+			for value in region.rect:
+				if not (value is int or value is float) or not is_finite(value) or value < -2 or value > 3:
+					return false
+			if region.rect[2] <= region.rect[0] or region.rect[3] <= region.rect[1]:
+				return false
 	return true
 
 static func load_tracks() -> Array:

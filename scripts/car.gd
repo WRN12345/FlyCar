@@ -20,6 +20,7 @@ var jets: Array[MeshInstance3D] = []
 var wheel_spin := 0.0
 var pending_reset := false
 var reset_pose := Transform3D.IDENTITY
+var chassis_collision: CollisionShape3D
 
 static func configure_inputs() -> void:
 	var keys := {"throttle": KEY_W, "brake": KEY_S, "steer_left": KEY_A, "steer_right": KEY_D, "burst": KEY_SPACE, "pitch_forward": KEY_UP, "pitch_back": KEY_DOWN, "roll_left": KEY_LEFT, "roll_right": KEY_RIGHT, "recover": KEY_R, "restart": KEY_ENTER, "pause": KEY_ESCAPE, "handbrake": KEY_SHIFT}
@@ -40,6 +41,7 @@ func _ready() -> void:
 	angular_damp = 0.45
 	can_sleep = false
 	var collision := CollisionShape3D.new()
+	chassis_collision = collision
 	var shape := BoxShape3D.new()
 	shape.size = Vector3(1.84, 0.53, 4.22)
 	collision.shape = shape
@@ -77,6 +79,11 @@ func _ready() -> void:
 func reset_to(pose: Transform3D) -> void:
 	reset_pose = pose
 	pending_reset = true
+
+func lowest_chassis_y() -> float:
+	var half: Vector3 = (chassis_collision.shape as BoxShape3D).size * 0.5
+	var axes := chassis_collision.global_basis
+	return chassis_collision.global_position.y - absf(axes.x.y) * half.x - absf(axes.y.y) * half.y - absf(axes.z.y) * half.z
 
 func _integrate_forces(state: PhysicsDirectBodyState3D) -> void:
 	if pending_reset:
