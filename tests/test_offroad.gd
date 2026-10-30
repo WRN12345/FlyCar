@@ -34,9 +34,17 @@ func run() -> void:
 				match_height = false
 	check(match_height, "terrain collision matches queried height across chunks and river/canyon")
 	var safe := true
+	var steepest:=Vector3.ZERO
+	var minimum_normal:=1.0
 	for p in course.route:
-		if course.terrain.surface_at(p).normal.y < 0.88:
+		var normal_y:float=course.terrain.surface_at(p).normal.y
+		if normal_y<minimum_normal:
+			minimum_normal=normal_y
+			steepest=p
+		if normal_y < 0.88:
 			safe = false
+	if not safe:
+		print("Steepest main route point: ",steepest," normal.y=",minimum_normal)
 	check(safe, "main route avoids cliffs and excessive low-car slopes")
 	var ordered := true
 	for i in range(1,8):

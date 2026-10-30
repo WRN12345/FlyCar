@@ -47,7 +47,7 @@ func build(definition: Dictionary) -> void:
 	for distance in range(35,int(length),25):
 		var pose := pose_at(distance)
 		for side in [-1,1]:
-			var p: Vector3 = pose.origin+pose.basis.x*side*7
+			var p: Vector3 = pose.origin+pose.basis.x*side*(Valley.TRAIL_HALF_WIDTH+0.55)
 			p.y = Ground.height_at(p.x,p.z)
 			flag(p,Color("dccd9e"))
 	for entry in [[Vector3(0,0,-100),"DIRT / 土路"],[Vector3(-210,0,-410),"GRAVEL / 碎石"],[Vector3(-490,0,-740),"MUD / 泥泞减速"],[Vector3(-130,0,-970),"GRASS / 草坡横切"],[Vector3(200,0,-830),"RIVER / 浅水慢行"],[Vector3(425,0,-530),"CANYON / 主路左绕 · 捷径喷射"]]:

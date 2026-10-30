@@ -7,12 +7,17 @@ static var profiles: Dictionary = {}
 
 static func raw_height(x: float, z: float) -> float:
 	var h := 10.0 + sin(x * 0.005) * 6.0 + sin(z * 0.005) * 5.0
+	var canyon_corridor := smoothstep(300.0,370.0,x)*(1-smoothstep(570.0,620.0,x))*smoothstep(-650.0,-570.0,z)*(1-smoothstep(-300.0,-250.0,z))
+	var start_blend:=smoothstep(40.0,100.0,Vector2(x,z).length())
+	h += (7.5*sin(z*0.022)+5.5*sin(x*0.018+z*0.007))*(1-canyon_corridor)*start_blend
 	# Scenic interior ridges leave the perimeter driving corridor comparatively gentle.
 	h += 52.0 * exp(-pow((x+130)/105,2)-pow((z+650)/115,2))
 	h += 40.0 * exp(-pow((x-120)/85,2)-pow((z+350)/105,2))
 	h += 11.0 * exp(-pow((x + 425) / 130, 2) - pow((z + 740) / 170, 2))
 	h += 7.0 * exp(-pow((x - 430) / 150, 2) - pow((z + 200) / 180, 2))
 	h += sin(x * 0.19) * sin(z * 0.22) * 0.07
+	var rock_bed := smoothstep(270.0,310.0,x)*(1-smoothstep(480.0,530.0,x))*smoothstep(-610.0,-560.0,z)*(1-smoothstep(-300.0,-260.0,z))
+	h += sin(x*0.42)*sin(z*0.51)*0.12*rock_bed*(1-canyon_corridor)
 	var river := (1.0 - smoothstep(35.0, 110.0, absf(x - 255))) * smoothstep(-1160.0, -1100.0, z) * (1.0 - smoothstep(-640.0,-580.0,z))
 	var bed := 2.0 - 3.2 * exp(-pow((x - 255) / 25, 2) - pow((z + 1040) / 40, 2))
 	h = lerpf(h, bed, river)
@@ -60,7 +65,7 @@ static func material_at(x: float, z: float, on_trail: bool = true) -> String:
 		return "mud"
 	if z < -890:
 		return "grass"
-	if x > 300 and z > -570 and z < -300:
+	if x > 270 and z > -610 and z < -280:
 		return "rock"
 	if x < -80 and z > -650:
 		return "gravel"
