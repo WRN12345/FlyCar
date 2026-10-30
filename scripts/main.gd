@@ -9,6 +9,7 @@ const Course = preload("res://scripts/course.gd")
 const OffroadCourse = preload("res://scripts/offroad_course.gd")
 const Menu = preload("res://scripts/track_menu.gd")
 const Impact = preload("res://scripts/impact_effect.gd")
+var mouse_look = preload("res://scripts/orbit_camera.gd").new()
 var car: RigidBody3D
 var camera: Camera3D
 var course: Node3D
@@ -48,6 +49,7 @@ var legacy_mountains:Array[Node3D]=[]
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	get_window().focus_exited.connect(mouse_look.end_drag)
 	Car.configure_inputs()
 	if not InputMap.has_action("maps"):
 		InputMap.add_action("maps")
@@ -130,6 +132,7 @@ func build_environment() -> void:
 		legacy_mountains.append(Geo.mesh_node(self, mountain, Vector3(cos(angle) * distance, height / 2 - 12, sin(angle) * distance), Geo.material(Color("4e6e68"))))
 
 func switch_track(index: int) -> void:
+	mouse_look.reset()
 	if index < 0 or index >= tracks.size():
 		return
 	get_tree().paused = false
@@ -156,6 +159,7 @@ func switch_track(index: int) -> void:
 	race = Race.new(gates.size())
 	best_time = float(best_times.get(tracks[index].id, 0.0))
 	recovery_pose = course.spawn
+	mouse_look.reset()
 	car.reset_to(recovery_pose)
 	car.fuel = 1.0
 	car.visible = true
@@ -174,6 +178,7 @@ func switch_track(index: int) -> void:
 	camera.look_at(recovery_pose.origin + forward * 4)
 
 func open_maps() -> void:
+	mouse_look.end_drag()
 	if menu.is_open:
 		return
 	menu_was_paused = get_tree().paused
@@ -294,10 +299,11 @@ func build_hud() -> void:
 	hud_fuel.size = Vector2(320, 7)
 	bottom.add_child(hud_fuel)
 	hud_status = ui_label(bottom, "", Vector2(20, 125), 11, Color("9cb6bd"))
-	var controls := panel(root, Vector2(-450, -118), Vector2(420, 88), true, true)
+	var controls := panel(root, Vector2(-450, -142), Vector2(420, 112), true, true)
 	ui_label(controls, "W / S  驱动 / 刹车    A / D  转向    Shift  手刹", Vector2(16, 11), 12)
 	ui_label(controls, "SPACE 起飞 / 下落减速 · 方向键姿态喷射", Vector2(16, 35), 12, Color("b5ec67"))
 	ui_label(controls, "R 复位   ENTER 重开   M 地图   ESC 暂停", Vector2(16, 59), 12, Color("9cb6bd"))
+	ui_label(controls, "鼠标右键拖动环视 · 滚轮缩放 · 中键回正", Vector2(16, 83), 12, Color("9cb6bd"))
 	banner = ui_label(root, "", Vector2.ZERO, 36)
 	banner.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
 	banner.offset_left = -390
@@ -320,6 +326,7 @@ func build_hud() -> void:
 
 func panel(parent: Control, pos: Vector2, dimensions: Vector2, right: bool = false, bottom: bool = false) -> Panel:
 	var node := Panel.new()
+	node.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	parent.add_child(node)
 	if right:
 		node.anchor_left = 1
@@ -341,6 +348,7 @@ func panel(parent: Control, pos: Vector2, dimensions: Vector2, right: bool = fal
 
 func ui_label(parent: Control, text: String, pos: Vector2, font_size: int, color: Color = Color("edf5ef")) -> Label:
 	var label := Label.new()
+	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	label.text = text
 	label.position = pos
 	label.add_theme_font_size_override("font_size", font_size)
@@ -357,6 +365,7 @@ func recover() -> void:
 		return
 	car.visible = true
 	car.freeze = false
+	mouse_look.reset()
 	car.reset_to(recovery_pose)
 	if race.finished:
 		show_result()
@@ -374,6 +383,7 @@ func restart_race() -> void:
 	menu.close()
 	race.restart()
 	recovery_pose = course.spawn
+	mouse_look.reset()
 	car.reset_to(recovery_pose)
 	car.fuel = 1.0
 	car.visible = true
@@ -390,6 +400,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		open_maps()
 		return
 	if event.is_action_pressed("pause"):
+		mouse_look.end_drag()
 		get_tree().paused = not get_tree().paused
 		if get_tree().paused:
 			banner.text = "PAUSED\nESC 继续 / M 选择地图"
@@ -403,6 +414,9 @@ func _unhandled_input(event: InputEvent) -> void:
 		restart_race()
 	if event.is_action_pressed("recover") and not get_tree().paused and countdown <= 0:
 		recover()
+
+	if not get_tree().paused and mouse_look.handle(event):
+		get_viewport().set_input_as_handled()
 
 func _physics_process(dt: float) -> void:
 	if get_tree().paused or active_index < 0 or car.pending_reset:
@@ -419,6 +433,7 @@ func _physics_process(dt: float) -> void:
 			clear_impact()
 			recover()
 		return
+	mouse_look.probe(car)
 	if countdown > 0:
 		countdown = maxf(0, countdown - dt)
 		if not car.pending_reset:
@@ -457,9 +472,7 @@ func _process(dt: float) -> void:
 		forward = Vector3.FORWARD
 	forward = forward.normalized()
 	if not car.pending_reset and death_remaining <= 0:
-		var desired := car.position - forward * 10.5 + Vector3.UP * 4.1
-		camera.position = camera.position.lerp(desired, 1 - exp(-dt * 5))
-		camera.look_at(car.position + Vector3.UP * 0.6 + forward * 4.5)
+		mouse_look.update(camera, car, dt)
 		camera.fov = lerpf(camera.fov, 68 + clampf(car.linear_velocity.length() * 0.17, 0, 12), 1 - exp(-dt * 3))
 	hud_speed.text = "%03d" % roundi(car.linear_velocity.length() * 3.6)
 	hud_time.text = format_time(race.elapsed)
@@ -481,7 +494,7 @@ func _process(dt: float) -> void:
 	elif car.charging:
 		hud_hint.text = "气压回充中 · 可继续驾驶 · 留气用于起飞和手动下落减速"
 	elif tracks[active_index].get("mode","") == "offroad":
-		hud_hint.text = "%s · 旗帜指引主路 / 黄色旗帜为捷径 · 下落按 Space 减速" % (car.surface_label if car.contacts>0 else "腾空 · 方向键调姿态")
+		hud_hint.text = "%s · 小地图指引路线与捷径 · 下落按 Space 减速" % (car.surface_label if car.contacts>0 else "腾空 · 方向键调姿态")
 		for cut in course.shortcuts:
 			if car.position.distance_to(cut.points[0]) < 70:
 				hud_hint.text = "峡谷捷径：距沟边约 %dm · 约70km/h+，起飞短喷后留气下落补喷 · 主路可绕行" % roundi(maxf(0,-446-car.position.z)) if cut.entry_gate==5 else "草坡捷径 · 控速横切，注意侧翻 · 检查点仍需顺序通过"
