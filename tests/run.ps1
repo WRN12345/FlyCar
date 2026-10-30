@@ -12,7 +12,7 @@ function Invoke-Check([string]$Name, [string[]]$Arguments) {
     }
 }
 Invoke-Check 'import' @('--editor', '--import')
-foreach ($name in @('math', 'physics', 'race', 'world', 'obstacles', 'catalog', 'china', 'china_obstacles', 'surfaces', 'road_corners', 'car_visual', 'jets', 'landing', 'jet_effects', 'offroad_model', 'offroad', 'offroad_drive', 'rugged_trails')) {
+foreach ($name in @('math', 'physics', 'race', 'world', 'obstacles', 'catalog', 'china', 'china_obstacles', 'surfaces', 'road_corners', 'car_visual', 'jets', 'landing', 'jet_effects', 'offroad_model', 'offroad', 'offroad_drive', 'rugged_trails', 'repeat_jets', 'forest_scene')) {
     Invoke-Check $name @('--script', "tests/test_$name.gd")
 }
 Invoke-Check 'offroad_lap' @('--fixed-fps','120','--script','tests/test_offroad_lap.gd')

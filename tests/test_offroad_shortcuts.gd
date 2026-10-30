@@ -28,11 +28,15 @@ func run() -> void:
 	var ground=load("res://scripts/offroad_model.gd")
 	var start:=Vector3(-423,ground.height_at(-423,-599)+0.9,-599)
 	var end: Vector3=world.gates[3].origin-world.gates[3].basis.z*15
+	var grass_exit:Vector3=world.course.shortcuts[0].points[1]
+	var grass_waypoint:=false
 	world.car.reset_to(Transform3D(Basis.looking_at((end-start).normalized()),start))
 	for tick in 6000:
 		await physics_frame
+		if world.car.position.distance_to(grass_exit)<12:
+			grass_waypoint=true
 		if tick%4==0:
-			control(end,12)
+			control(end if grass_waypoint else grass_exit,12)
 		if world.race.next_gate==4 or world.death_remaining>0:
 			break
 	var grass_ok: bool=world.race.next_gate==4 and world.death_remaining==0

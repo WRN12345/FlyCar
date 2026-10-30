@@ -38,6 +38,12 @@ func capture() -> void:
 		await process_frame
 		await RenderingServer.frame_post_draw
 		root.get_texture().get_image().save_png(out.path_join("offroad-"+key+".png"))
+		if key in ["climb","rock"]:
+			root.get_texture().get_image().save_jpg(out.path_join("forest-"+key+".jpg"),.9)
+		if key=="climb":
+			for i in 90:
+				await process_frame
+			print("Forest native profile: fps=",Engine.get_frames_per_second()," draw_calls=",Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME)," objects=",Performance.get_monitor(Performance.RENDER_TOTAL_OBJECTS_IN_FRAME))
 		world.car.freeze=false
 	world.car.freeze=true
 	world.camera.position=Vector3(230,930,590)

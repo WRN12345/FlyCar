@@ -1,6 +1,7 @@
 extends Node3D
 const Model = preload("res://scripts/offroad_model.gd")
 const Geo = preload("res://scripts/geometry.gd")
+const Forest=preload("res://scripts/forest_scene.gd")
 var bounds := Model.BOUNDS
 var regions: Array = []
 var bins: Dictionary = {}
@@ -34,12 +35,14 @@ uniform vec4 map_bounds;
 varying vec3 pos;
 float hash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
 float noise(vec2 p){vec2 i=floor(p);vec2 f=fract(p);f=f*f*(3.-2.*f);return mix(mix(hash(i),hash(i+vec2(1.,0.)),f.x),mix(hash(i+vec2(0.,1.)),hash(i+vec2(1.,1.)),f.x),f.y);}
+vec3 bump(vec3 n,float h,vec3 p){vec3 dx=dFdx(p);vec3 dy=dFdy(p);vec3 a=cross(dy,n);vec3 b=cross(n,dx);float det=dot(dx,a);return normalize(max(abs(det),.00001)*n-sign(det)*(dFdx(h)*a+dFdy(h)*b));}
 void vertex(){pos=(MODEL_MATRIX*vec4(VERTEX,1.)).xyz;}
 void fragment(){
     vec4 trail=texture(trail_map,(pos.xz-map_bounds.xy)/map_bounds.zw);
     float detail=(noise(pos.xz*2.1)-.5)/(1.+length(fwidth(pos.xz))*5.);
     float variation=.94+.12*noise(pos.xz*.19)+.12*detail;
     ALBEDO=mix(COLOR.rgb,trail.rgb,trail.a)*variation;
+    NORMAL=bump(NORMAL,detail*.018*trail.a,VERTEX);
     ROUGHNESS=.98;
 }
 """
@@ -89,8 +92,10 @@ void fragment(){
 			add_child(body)
 			Geo.mesh_node(body,st.commit(),Vector3.ZERO,material)
 	build_water()
-	build_scenery()
 	build_trail_rocks()
+	var forest:=Forest.new()
+	add_child(forest)
+	forest.build(self)
 
 static func distance_to_segment(p: Vector2,a: Vector2,b: Vector2) -> float:
 	var delta := b-a
@@ -118,12 +123,12 @@ func build_trail_mask() -> void:
 		var steps:=maxi(1,ceili(a.distance_to(b)*MASK_SCALE))
 		for j in steps:
 			var p:=a.lerp(b,float(j)/steps)
-			paint_trail(p,TRAIL_HALF_WIDTH,Model.profile(Model.material_at(p.x,p.y)).color)
+			paint_trail(p,TRAIL_HALF_WIDTH,Model.profile(Model.material_at(p.x,p.y)).color,(b-a).normalized().orthogonal())
 	var length: float=grass_cut[0].distance_to(grass_cut[1])
 	for i in ceili(length*MASK_SCALE):
-		paint_trail(grass_cut[0].lerp(grass_cut[1],i/(length*MASK_SCALE)),1.65,Color("71814c"))
+		paint_trail(grass_cut[0].lerp(grass_cut[1],i/(length*MASK_SCALE)),1.65,Color("71814c"),(grass_cut[1]-grass_cut[0]).normalized().orthogonal())
 
-func paint_trail(p:Vector2,half_width:float,color:Color) -> void:
+func paint_trail(p:Vector2,half_width:float,color:Color,side:Vector2) -> void:
 	var pixel:=(p-bounds.position)*MASK_SCALE
 	var linear:=color.srgb_to_linear()
 	var radius:=ceili((half_width+TRAIL_EDGE)*MASK_SCALE)+1
@@ -132,7 +137,9 @@ func paint_trail(p:Vector2,half_width:float,color:Color) -> void:
 			var distance:=Vector2(x+0.5,z+0.5).distance_to(pixel)/MASK_SCALE
 			var alpha:=1-smoothstep(half_width-TRAIL_EDGE,half_width+TRAIL_EDGE,distance)
 			if alpha>trail_image.get_pixel(x,z).a:
-				trail_image.set_pixel(x,z,Color(linear.r,linear.g,linear.b,alpha))
+				var lateral:=((Vector2(x+.5,z+.5)-pixel)/MASK_SCALE).dot(side)
+				var wear:=.82+.18*smoothstep(.09,.32,absf(absf(lateral)-.85))
+				trail_image.set_pixel(x,z,Color(linear.r*wear,linear.g*wear,linear.b*wear,alpha))
 
 func surface_at(p: Vector3) -> Dictionary:
 	var depth: float = Model.water_depth(p.x,p.z)
@@ -145,56 +152,12 @@ func surface_at(p: Vector3) -> Dictionary:
 
 func build_water() -> void:
 	var shader := Shader.new()
-	shader.code = "shader_type spatial; varying vec3 p; void vertex(){p=(MODEL_MATRIX*vec4(VERTEX,1.)).xyz;} void fragment(){ALBEDO=mix(vec3(.08,.25,.29),vec3(.20,.43,.43),.5+.2*sin(p.x*1.5+TIME)*sin(p.z*.8-TIME)); ROUGHNESS=.28;}"
+	shader.code = "shader_type spatial; varying vec3 p; void vertex(){p=(MODEL_MATRIX*vec4(VERTEX,1.)).xyz;} void fragment(){float ripple=sin(p.x*.45+p.z*.8-TIME*1.2)+.5*sin(p.x*1.2-p.z*.35+TIME*.7); ALBEDO=mix(vec3(.018,.065,.055),vec3(.06,.18,.145),.5+.12*ripple); NORMAL_MAP=vec3(.5+.012*ripple,.5+.008*sin(p.z*.9+p.x*.7-TIME),1.); ROUGHNESS=.38;SPECULAR=.35;ALPHA=.76;}"
 	var material := ShaderMaterial.new()
 	material.shader = shader
 	var plane := PlaneMesh.new()
 	plane.size = Vector2(70,520)
 	Geo.mesh_node(self,plane,Vector3(255,Model.WATER_HEIGHT,-860),material).name = "River"
-
-func build_scenery() -> void:
-	var rng := RandomNumberGenerator.new()
-	rng.seed = 61027
-	var bark := Geo.material(Color("51412e"))
-	var leaf := Geo.material(Color("35583b"))
-	var rock := Geo.material(Color("6b706a"))
-	for i in 200:
-		var p := Vector3(rng.randf_range(-650,590),0,rng.randf_range(-1120,230))
-		if trail_distance(Vector2(p.x,p.z)) < 20 or Model.water_depth(p.x,p.z)>0 or distance_to_segment(Vector2(p.x,p.z),grass_cut[0],grass_cut[1])<15:
-			continue
-		if p.x>350 and p.z> -550 and p.z < -290:
-			continue
-		p.y = Model.height_at(p.x,p.z)
-		if i%3:
-			Geo.cylinder(self,0.25,3.5,p+Vector3.UP*1.75,bark)
-			var trunk_body := StaticBody3D.new()
-			var trunk_collision := CollisionShape3D.new()
-			var trunk_shape := CylinderShape3D.new()
-			trunk_shape.radius = 0.25
-			trunk_shape.height = 3.5
-			trunk_collision.shape = trunk_shape
-			trunk_body.position = p+Vector3.UP*1.75
-			trunk_body.add_child(trunk_collision)
-			add_child(trunk_body)
-			var crown := CylinderMesh.new()
-			crown.top_radius = 0
-			crown.bottom_radius = rng.randf_range(1.5,2.6)
-			crown.height = 5
-			crown.radial_segments = 7
-			Geo.mesh_node(self,crown,p+Vector3.UP*5,leaf)
-		else:
-			var stone := SphereMesh.new()
-			stone.radius = rng.randf_range(0.7,1.8)
-			stone.height = stone.radius*1.4
-			stone.radial_segments = 7
-			stone.rings = 4
-			var stone_body := StaticBody3D.new()
-			stone_body.position = p
-			var collider := CollisionShape3D.new()
-			collider.shape = stone.create_convex_shape()
-			stone_body.add_child(collider)
-			add_child(stone_body)
-			Geo.mesh_node(stone_body,stone,Vector3.ZERO,rock)
 
 func build_trail_rocks() -> void:
 	var rng:=RandomNumberGenerator.new()

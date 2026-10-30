@@ -19,6 +19,8 @@ var contacts := 0
 var burning := false
 var steering := 0.0
 var recharge_delay := 0.0
+var burst_locked:=false
+var charging:=false
 var wheels: Array[Node3D] = []
 var rays: Array[RayCast3D] = []
 var jet_effect: Node3D
@@ -100,6 +102,7 @@ func clear_jets() -> void:
 	nozzle_duties.fill(0)
 	burning = false
 	jet_mode = "READY"
+	charging=false
 	nozzle_hits.clear()
 	exhaust_hits.clear()
 	landing_height = INF
@@ -160,6 +163,7 @@ func _integrate_forces(state: PhysicsDirectBodyState3D) -> void:
 		throttle -= brake * 0.45
 		brake = 0.0
 	contacts = 0
+	var supported_load:=0.0
 	for i in rays.size():
 		var ray := rays[i]
 		ray.force_raycast_update()
@@ -180,6 +184,7 @@ func _integrate_forces(state: PhysicsDirectBodyState3D) -> void:
 				surface_label = surface.label
 				severe_impact_speed = maxf(severe_impact_speed,-velocity.dot(normal))
 			var load_n := clampf((REST - length) * spring_rate - velocity.dot(up) * damper, 0.0, 28000.0)
+			supported_load+=load_n*maxf(0,normal.dot(Vector3.UP))
 			state.apply_force(up * load_n, offset)
 			var wheel_forward := forward.rotated(up, steering if i < 2 else 0.0)
 			wheel_forward = wheel_forward.slide(normal).normalized()
@@ -191,7 +196,12 @@ func _integrate_forces(state: PhysicsDirectBodyState3D) -> void:
 		wheels[i].rotation.y = steering if i < 2 else 0.0
 		wheels[i].get_node("WheelVisual").rotation.x = wheel_spin
 	wheel_spin -= speed / RADIUS * dt
-	var burst_requested := Input.is_action_pressed("burst")
+	var trigger_pressed:=Input.is_action_pressed("burst")
+	if not trigger_pressed:
+		burst_locked=false
+	elif fuel<=0.0001:
+		burst_locked=true
+	var burst_requested := trigger_pressed and not burst_locked
 	var descending := contacts == 0 and state.linear_velocity.y < -0.25
 	var road_below := probe_landing(state)
 	var landing := Thrusters.landing_duty(landing_height, state.linear_velocity.y, up.dot(Vector3.UP), road_below, contacts, nozzle_force * 4 / mass) if auto_landing_enabled else 0.0
@@ -201,6 +211,8 @@ func _integrate_forces(state: PhysicsDirectBodyState3D) -> void:
 	var result: Dictionary = Thrusters.consume(Thrusters.duties(base, pitch, roll), fuel, dt)
 	nozzle_duties = result.duties
 	fuel = result.fuel
+	if fuel<=0.0001 and trigger_pressed:
+		burst_locked=true
 	burning = false
 	for duty in nozzle_duties:
 		burning = burning or duty > 0.0001
@@ -220,9 +232,12 @@ func _integrate_forces(state: PhysicsDirectBodyState3D) -> void:
 	if burning:
 		for i in Thrusters.NOZZLES.size():
 			state.apply_force(thrust_direction * nozzle_force * nozzle_duties[i], state.transform.basis * Thrusters.NOZZLES[i])
-		recharge_delay = 0.8
+		recharge_delay = 0.35
 	else:
 		recharge_delay = maxf(0.0, recharge_delay - dt)
+	charging=not burning and recharge_delay<=0 and not burst_requested and fuel<0.999 and Model.can_recharge(contacts,supported_load,up.dot(Vector3.UP),mass)
+	if charging:
+		fuel = Model.next_fuel(fuel, false, true, dt)
 	if not burning:
-		fuel = Model.next_fuel(fuel, false, contacts >= 3 and recharge_delay <= 0.0 and not burst_requested, dt)
+		jet_mode="RELEASE SPACE" if burst_locked else "RECHARGING" if charging else "LOW PRESSURE" if fuel<=0.15 else "READY"
 	state.apply_central_force(-state.linear_velocity * state.linear_velocity.length() * 0.43)

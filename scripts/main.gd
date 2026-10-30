@@ -42,6 +42,9 @@ var impact_duration := 0.0
 var sink_origin := Vector3.ZERO
 var sink_basis := Basis.IDENTITY
 var record_path := "user://flycar.cfg"
+var scene_environment:Environment
+var sunlight:DirectionalLight3D
+var legacy_mountains:Array[Node3D]=[]
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -86,6 +89,7 @@ func _ready() -> void:
 func build_environment() -> void:
 	var world := WorldEnvironment.new()
 	var environment := Environment.new()
+	scene_environment=environment
 	environment.background_mode = Environment.BG_SKY
 	var sky := Sky.new()
 	var sky_material := ProceduralSkyMaterial.new()
@@ -105,6 +109,7 @@ func build_environment() -> void:
 	world.environment = environment
 	add_child(world)
 	var sun := DirectionalLight3D.new()
+	sunlight=sun
 	sun.rotation_degrees = Vector3(-38, -42, 0)
 	sun.light_color = Color("ffe1b9")
 	sun.light_energy = 1.0
@@ -122,7 +127,7 @@ func build_environment() -> void:
 		mountain.top_radius = 8
 		mountain.height = height
 		mountain.radial_segments = 5
-		Geo.mesh_node(self, mountain, Vector3(cos(angle) * distance, height / 2 - 12, sin(angle) * distance), Geo.material(Color("4e6e68")))
+		legacy_mountains.append(Geo.mesh_node(self, mountain, Vector3(cos(angle) * distance, height / 2 - 12, sin(angle) * distance), Geo.material(Color("4e6e68"))))
 
 func switch_track(index: int) -> void:
 	if index < 0 or index >= tracks.size():
@@ -133,6 +138,12 @@ func switch_track(index: int) -> void:
 		remove_child(course)
 		course.queue_free()
 	var offroad: bool = tracks[index].get("mode","") == "offroad"
+	for mountain in legacy_mountains:
+		mountain.visible=not offroad
+	scene_environment.fog_density=.00125 if offroad else .00035
+	scene_environment.fog_light_color=Color("7e9189") if offroad else Color("9dbab9")
+	scene_environment.ambient_light_energy=.48 if offroad else .65
+	sunlight.light_energy=1.15 if offroad else 1.0
 	course = OffroadCourse.new() if offroad else Course.new()
 	add_child(course)
 	course.build(tracks[index])
@@ -465,6 +476,10 @@ func _process(dt: float) -> void:
 		hud_hint.text = "WASD 驾驶 · Space 短喷 · M 切换地图 · 记得在 Godot 窗口顶部选择“输入”"
 	elif car.global_basis.y.dot(Vector3.UP) < 0.2 and car.linear_velocity.length() < 3:
 		hud_hint.text = "车辆侧翻 · 按 R 返回检查点（+3秒）"
+	elif car.burst_locked:
+		hud_hint.text = "空罐保护 · 松开 Space 后可重新喷射 · 稳定接地约2秒回满气压"
+	elif car.charging:
+		hud_hint.text = "气压回充中 · 可继续驾驶 · 留气用于起飞和手动下落减速"
 	elif tracks[active_index].get("mode","") == "offroad":
 		hud_hint.text = "%s · 旗帜指引主路 / 黄色旗帜为捷径 · 下落按 Space 减速" % (car.surface_label if car.contacts>0 else "腾空 · 方向键调姿态")
 		for cut in course.shortcuts:

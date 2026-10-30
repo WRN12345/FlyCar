@@ -4,7 +4,10 @@ extends RefCounted
 static func next_fuel(current: float, burning: bool, grounded: bool, dt: float) -> float:
 	if burning:
 		return maxf(0.0, current - dt / 1.2)
-	return minf(1.0, current + dt * 0.18) if grounded else current
+	return minf(1.0, current + dt * 0.5) if grounded else current
+
+static func can_recharge(contacts: int, supported_load: float, upright: float, mass: float) -> bool:
+	return contacts >= 2 and upright > 0.65 and supported_load >= mass*9.81*0.35
 
 static func tire_force(load_n: float, side_speed: float, speed: float, throttle: float, brake: float, grip: float, rolling: float = 9.0) -> Vector2:
 	if load_n <= 0.0:
