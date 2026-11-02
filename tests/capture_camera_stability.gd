@@ -3,6 +3,7 @@ func _initialize() -> void:
 	call_deferred("capture")
 func capture() -> void:
 	var out := OS.get_cmdline_user_args()[0]
+	var jets := OS.get_cmdline_user_args().size()<2 or OS.get_cmdline_user_args()[1]!="drive"
 	var world = load("res://main.tscn").instantiate()
 	root.add_child(world)
 	world.switch_track(world.active_index)
@@ -30,13 +31,14 @@ func capture() -> void:
 		Input.action_press("steer_left",clampf(error*2.8,0,1))
 		Input.action_press("steer_right",clampf(-error*2.8,0,1))
 		Input.action_press("throttle",0.65 if world.car.linear_velocity.length()<7 else 0)
-		if frame==90: Input.action_press("burst")
-		if frame==110: Input.action_release("burst")
+		if jets and frame==90: Input.action_press("burst")
+		if jets and frame==110: Input.action_release("burst")
+		await RenderingServer.frame_post_draw
 		if frame>30:
 			max_angle = maxf(max_angle,previous.angle_to(world.camera.global_basis.z))
 		previous = world.camera.global_basis.z
 	for action in ["steer_left","steer_right","throttle","burst"]: Input.action_release(action)
 	await RenderingServer.frame_post_draw
-	root.get_texture().get_image().save_jpg(out.path_join("camera-stable-drive.jpg"),0.9)
-	print("Native camera drive/jump: max_angle_radians=",max_angle," recoveries=",world.race.recoveries," death=",world.death_remaining)
+	root.get_texture().get_image().save_jpg(out.path_join("camera-stable-drive.jpg" if jets else "camera-normal-driving.jpg"),0.9)
+	print("Native camera driving: interpolation=",physics_interpolation," jet_trial=",jets," max_angle_radians=",max_angle," recoveries=",world.race.recoveries," death=",world.death_remaining)
 	quit(1 if world.race.recoveries>0 or world.death_remaining>0 else 0)

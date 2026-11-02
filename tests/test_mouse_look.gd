@@ -59,6 +59,7 @@ func run() -> void:
 	course.free()
 	var world = load("res://scripts/main.gd").new()
 	root.add_child(world)
+	check(world.get_tree().physics_interpolation,"Vehicle visuals share the camera interpolation timeline")
 	check(world.camera.physics_interpolation_mode==Node.PHYSICS_INTERPOLATION_MODE_OFF,"Manual camera interpolation is not applied twice")
 	world.switch_track(world.active_index)
 	world.mouse_look.dragging = true

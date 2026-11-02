@@ -86,6 +86,8 @@ func _ready() -> void:
 	add_child(jet_effect)
 	surface_effect = SurfaceEffect.new()
 	add_child(surface_effect)
+	# Initialize the visual interpolation pump before the first spawn/reset.
+	get_global_transform_interpolated()
 
 func _process(_dt: float) -> void:
 	if freeze or pending_reset or not visible:
@@ -137,6 +139,8 @@ func _integrate_forces(state: PhysicsDirectBodyState3D) -> void:
 		state.transform = reset_pose
 		state.linear_velocity = Vector3.ZERO
 		state.angular_velocity = Vector3.ZERO
+		# Body state is copied back to the node after this callback.
+		reset_physics_interpolation.call_deferred()
 		pending_reset = false
 		steering = 0.0
 		burning = false

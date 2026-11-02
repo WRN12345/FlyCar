@@ -12,6 +12,7 @@ var rng := RandomNumberGenerator.new()
 static var sound_cache: Dictionary = {}
 
 func _ready() -> void:
+	physics_interpolation_mode = Node.PHYSICS_INTERPOLATION_MODE_OFF
 	process_mode = Node.PROCESS_MODE_PAUSABLE
 	rng.seed = 481
 	if kind == "water":

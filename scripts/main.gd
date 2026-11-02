@@ -50,6 +50,7 @@ var sunlight:DirectionalLight3D
 var legacy_mountains:Array[Node3D]=[]
 
 func _ready() -> void:
+	get_tree().physics_interpolation = true
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	get_window().focus_exited.connect(mouse_look.end_drag)
 	Car.configure_inputs()
@@ -153,6 +154,7 @@ func switch_track(index: int) -> void:
 	course = OffroadCourse.new() if offroad else Course.new()
 	add_child(course)
 	course.build(tracks[index])
+	course.reset_physics_interpolation()
 	car.surface_provider = course.terrain if offroad else null
 	course.gate_entered.connect(_gate_entered)
 	active_index = index

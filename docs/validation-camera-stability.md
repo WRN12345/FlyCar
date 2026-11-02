@@ -1,5 +1,24 @@
 # Camera jitter correction
 
+## Follow-up: continuous normal-driving jitter
+
+The first fix smoothed/interpolated only the camera. The project's vehicle rendering still had physics interpolation disabled, so the visible car jumped between physics poses while the camera moved between them. The earlier synthetic camera tests did not render the car and therefore missed this phase mismatch.
+
+The project now enables physics interpolation; `main._ready()` also enables it at runtime so editor-cached project settings cannot leave the old behavior active. Camera interpolation remains manual/off to avoid applying it twice. Car spawns and teleports prime and reset their interpolation history after the physics transform has synced back to the node. New course history is reset on creation. Frame-driven wreck effects explicitly disable automatic interpolation.
+
+Native constant-velocity render measurements (`probe_camera_render.gd`, 120 Hz physics, screen-space vehicle position relative to the camera):
+
+| Render cap | Old vehicle rendering | Synchronized rendering |
+| --- | --- | --- |
+| 75 FPS | 2.77 px range | <0.001 px range |
+| 144 FPS | 3.20 px range | <0.001 px range |
+
+These measure removal of render quantization in a controlled uniform-motion fixture, not elimination of real suspension movement or low-FPS stalls. A 100 m actual-car teleport produced 0 m stale render deviation. Native forest driving without jets and a separate drive/jump trial both ran with interpolation enabled and no crash/recovery.
+
+Run the render check without headless mode: `--script tests/probe_camera_render.gd -- 75 on` and `--script tests/probe_camera_render.gd -- 144 on`. The `off` mode reproduces the former configuration for comparison. Unlike the earlier mock tests, this checks the displayed vehicle pose at actual render cadence.
+
+## Earlier follow/occlusion fixes
+
 Root causes reproduced before changing implementation:
 
 - Position was smoothed while `look_at` used raw suspension position/heading, injecting high-frequency pitch into the view (0.010818 radians per frame in the alternating-bounce fixture).
