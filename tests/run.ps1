@@ -19,6 +19,7 @@ Invoke-Check 'trail_obstacles' @('--script','tests/test_trail_obstacles.gd')
 Invoke-Check 'route_boundary' @('--script','tests/test_route_boundary.gd')
 Invoke-Check 'trail_fence' @('--script','tests/test_trail_fence.gd')
 Invoke-Check 'camera_stability' @('--script','tests/test_camera_stability.gd')
+Invoke-Check 'mandatory_jumps' @('--fixed-fps','120','--script','tests/test_mandatory_jumps.gd')
 Invoke-Check 'offroad_lap' @('--fixed-fps','120','--script','tests/test_offroad_lap.gd')
 Invoke-Check 'offroad_shortcuts' @('--fixed-fps','120','--script','tests/test_offroad_shortcuts.gd')
 Write-Output 'PASS: all FlyCar checks completed.'

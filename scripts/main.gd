@@ -38,6 +38,7 @@ var message_time := 0.0
 var best_time := 0.0
 var best_times: Dictionary = {}
 var death_remaining := 0.0
+var race_failed := false
 var impact_effect: Node3D
 var impact_kind := ""
 var impact_duration := 0.0
@@ -194,6 +195,7 @@ func close_maps() -> void:
 	get_tree().paused = menu_was_paused
 
 func clear_impact() -> void:
+	race_failed = false
 	death_remaining = 0.0
 	impact_kind = ""
 	impact_duration = 0.0
@@ -201,20 +203,25 @@ func clear_impact() -> void:
 		impact_effect.queue_free()
 	impact_effect = null
 
-func begin_surface_impact(surface: Dictionary) -> void:
+func begin_surface_impact(surface: Dictionary, terminal: bool = false) -> void:
 	if death_remaining > 0 or countdown > 0 or car.pending_reset:
 		return
 	impact_kind = surface.kind
+	race_failed = terminal
 	impact_duration = 2.4 if impact_kind == "water" else 1.6
 	death_remaining = impact_duration
 	var velocity := car.linear_velocity
 	car.freeze = true
+	car.linear_velocity = Vector3.ZERO
+	car.angular_velocity = Vector3.ZERO
 	car.visible = impact_kind == "water"
+	mouse_look.end_drag()
 	car.clear_jets()
 	sink_origin = Vector3(car.position.x, surface.height + 0.15, car.position.z)
 	sink_basis = car.basis
 	impact_effect = Impact.new()
 	impact_effect.kind = impact_kind
+	impact_effect.floor_height = float(surface.get("ground_height",surface.height))-surface.height+0.25
 	impact_effect.impact_velocity = velocity
 	add_child(impact_effect)
 	impact_effect.global_position = Vector3(car.position.x, surface.height, car.position.z)
@@ -225,9 +232,11 @@ func begin_surface_impact(surface: Dictionary) -> void:
 	camera.position = impact_effect.position - forward * 9 + Vector3.UP * 5
 	camera.look_at(impact_effect.position + Vector3.UP * 0.4)
 	banner.text = "VEHICLE SUBMERGING\n落水 · 车辆正在下沉" if impact_kind == "water" else "VEHICLE WRECKED\n撞击地面 · 车身碎裂"
+	if terminal:
+		banner.text = "OUT OF BOUNDS · WRECKED\n越界撞毁 · Enter 重开 / M 换图"
 
 func _gate_entered(body: Node3D, index: int) -> void:
-	if body != car or countdown > 0 or death_remaining > 0 or car.pending_reset:
+	if body != car or countdown > 0 or death_remaining > 0 or car.pending_reset or race_failed:
 		return
 	if boundary_enabled and course.has_method("within_boundary") and not course.within_boundary(car.position):
 		return
@@ -365,7 +374,7 @@ func format_time(seconds: float) -> String:
 	return "%02d:%02d.%03d" % [int(ms / 60000.0), int(ms / 1000.0) % 60, ms % 1000]
 
 func recover() -> void:
-	if death_remaining > 0:
+	if death_remaining > 0 or race_failed:
 		return
 	car.visible = true
 	car.freeze = false
@@ -408,6 +417,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		get_tree().paused = not get_tree().paused
 		if get_tree().paused:
 			banner.text = "PAUSED\nESC 继续 / M 选择地图"
+		elif race_failed:
+			banner.text = "OUT OF BOUNDS · WRECKED\n越界撞毁 · Enter 重开 / M 换图"
 		elif death_remaining > 0:
 			banner.text = "VEHICLE SUBMERGING\n落水 · 车辆正在下沉" if impact_kind == "water" else "VEHICLE WRECKED\n撞击地面 · 车身碎裂"
 		elif race.finished:
@@ -419,30 +430,29 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("recover") and not get_tree().paused and countdown <= 0:
 		recover()
 
-	if not get_tree().paused and mouse_look.handle(event):
+	if not get_tree().paused and not race_failed and mouse_look.handle(event):
 		get_viewport().set_input_as_handled()
 
 func _physics_process(dt: float) -> void:
 	if get_tree().paused or active_index < 0 or car.pending_reset:
 		return
 	if death_remaining > 0:
-		if not race.finished:
+		if not race.finished and not race_failed:
 			race.elapsed += dt
 		death_remaining = maxf(0, death_remaining - dt)
 		if impact_kind == "water":
 			var progress := 1 - death_remaining / impact_duration
 			car.position = sink_origin - Vector3.UP * progress * 3.6
 			car.basis = sink_basis * Basis(Vector3.FORWARD, progress * 0.28)
-		if death_remaining <= 0:
+		if death_remaining <= 0 and not race_failed:
 			clear_impact()
 			recover()
 		return
+	if race_failed:
+		return
 	mouse_look.step(camera,car,dt)
 	if boundary_enabled and countdown<=0 and course.has_method("within_boundary") and not course.within_boundary(car.position):
-		recover()
-		if not race.finished:
-			banner.text = "OUT OF BOUNDS  +3.0s\n超出道路边界 · 已返回检查点"
-			message_time = 2.0
+		begin_surface_impact({"kind":"land","height":car.position.y-0.3,"ground_height":course.road_height_at(car.position)},true)
 		return
 	if countdown > 0:
 		countdown = maxf(0, countdown - dt)
@@ -481,7 +491,7 @@ func _process(dt: float) -> void:
 	if forward.length() < 0.1:
 		forward = Vector3.FORWARD
 	forward = forward.normalized()
-	if not car.pending_reset and death_remaining <= 0:
+	if not car.pending_reset and death_remaining <= 0 and not race_failed:
 		mouse_look.render(camera)
 		camera.fov = lerpf(camera.fov, 68 + clampf(car.linear_velocity.length() * 0.17, 0, 12), 1 - exp(-dt * 3))
 	hud_speed.text = "%03d" % roundi(car.linear_velocity.length() * 3.6)
@@ -493,7 +503,9 @@ func _process(dt: float) -> void:
 	map.queue_redraw()
 	for i in course.gate_lights.size():
 		course.gate_lights[i].material_override = course.selected if i == race.next_gate else course.accent
-	if death_remaining > 0:
+	if race_failed:
+		hud_hint.text = "越界撞毁 · 本次挑战结束 · Enter 重开 / M 换图"
+	elif death_remaining > 0:
 		hud_hint.text = "车辆正在沉入水中 · 随后返回检查点（+3秒）" if impact_kind == "water" else "车辆撞击地面碎裂 · 随后返回检查点（+3秒）"
 	elif countdown > 0:
 		hud_hint.text = "WASD 驾驶 · Space 短喷 · M 切换地图 · 记得在 Godot 窗口顶部选择“输入”"
@@ -508,6 +520,10 @@ func _process(dt: float) -> void:
 		for cut in course.shortcuts:
 			if car.position.distance_to(cut.points[0]) < 70:
 				hud_hint.text = "峡谷捷径：距沟边约 %dm · 约70km/h+，起飞短喷后留气下落补喷 · 主路可绕行" % roundi(maxf(0,-446-car.position.z)) if cut.entry_gate==5 else "草坡捷径 · 控速横切，注意侧翻 · 检查点仍需顺序通过"
+		for site in course.get_node("TrailObstacles").sites:
+			var delta: Vector3 = site.position-car.position
+			if delta.length()<30 and delta.dot(site.forward)>0:
+				hud_hint.text = "前方 %dm · %s · Space 起飞越障" % [roundi(delta.length()),["大岩石路障","横倒大树","高碎石堆"][site.kind]]
 	elif car.position.distance_to(course.barrier_pose.origin) < 55:
 		hud_hint.text = "前方实体路障 · 保持车速，短按 Space 约 0.4–0.5 秒"
 	elif car.position.distance_to(course.gap_pose.origin) < 70:

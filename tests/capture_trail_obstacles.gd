@@ -14,6 +14,7 @@ func capture() -> void:
 		var site: Dictionary = hazards.sites[kind]
 		var pose: Transform3D = world.course.pose_at(site.distance-8)
 		pose.origin.y += 0.9
+		world.car.freeze = false
 		world.car.reset_to(pose)
 		for i in 4:
 			await physics_frame
@@ -26,4 +27,16 @@ func capture() -> void:
 		await process_frame
 		await RenderingServer.frame_post_draw
 		root.get_texture().get_image().save_jpg(out.path_join("trail-hazard-%d.jpg"%kind),0.9)
+	var pose: Transform3D = world.course.pose_at(75)
+	world.car.position = pose.origin+pose.basis.x*12+Vector3.UP*3
+	world.car.linear_velocity = -pose.basis.z*12
+	world._physics_process(1.0/120)
+	if not world.race_failed:
+		push_error("Native boundary wreck did not trigger")
+		quit(1)
+		return
+	world.hud_hint.text = "越界撞毁 · 本次挑战结束 · Enter 重开 / M 换图"
+	for i in 45: await process_frame
+	await RenderingServer.frame_post_draw
+	root.get_texture().get_image().save_jpg(out.path_join("fatal-boundary-wreck.jpg"),0.9)
 	quit()

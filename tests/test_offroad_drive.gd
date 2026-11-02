@@ -55,7 +55,16 @@ func run() -> void:
 	world.countdown = 0
 	world.car.freeze = false
 	var shallow := Vector3(255,3.0,-800)
-	world.car.reset_to(Transform3D(Basis.IDENTITY,shallow))
+	var ford_index := 0
+	var ford_distance := INF
+	for i in world.route.size():
+		var separation: float = Vector2(world.route[i].x-shallow.x,world.route[i].z-shallow.z).length_squared()
+		if separation<ford_distance:
+			ford_distance = separation
+			ford_index = i
+	var ford_pose: Transform3D = world.course.pose_at(world.course.distances[ford_index])
+	ford_pose.origin.y += 0.9
+	world.car.reset_to(ford_pose)
 	await frames(150)
 	check(world.death_remaining == 0 and world.car.contacts >= 3, "shallow river supports wheels without triggering sinking")
 	Input.action_press("throttle")

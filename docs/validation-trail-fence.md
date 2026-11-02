@@ -7,4 +7,4 @@
 - Existing shortcut corridor checks are shared with boundary enforcement. Opening panels omit both rendered geometry and collision shapes. Flight corridors retain their open space.
 - Rendering uses one box mesh and 64 m MultiMesh chunks. Collision bodies use the same chunk ownership, and all fence nodes belong to the active course.
 - 2,171 main-road panels in the current valley map. Fence tests validate both sides, road clearance, terrain height, shortcut openings, rail orientation, collision rays and a real rigid-body side impact. Full-lap and shortcut tests verify integration with existing racing behavior.
-- The test driver uses a 1.1 m obstacle bypass offset to keep the vehicle inside the physically fenced road on steep cross-slopes, and reverses briefly if pinned at low speed. This assistance is limited to tests.
+- The test driver now uses manual jet and attitude inputs to cross full-width flight obstacles, and reverses briefly if pinned at low speed. This assistance is limited to tests.

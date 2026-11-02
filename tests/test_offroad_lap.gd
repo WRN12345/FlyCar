@@ -24,10 +24,13 @@ func run() -> void:
 	var done := false
 	var stalled_ticks := 0
 	var reversing_ticks := 0
+	var jumped: Dictionary = {}
+	var active_jump := -1
+	var burst_ticks := 0
 	for tick in 60000:
 		await physics_frame
-		if world.death_remaining>0 or world.race.recoveries>0:
-			push_error("Main route driver crashed near point %d / CP %d" % [index,world.race.next_gate])
+		if world.death_remaining>0 or world.race.recoveries>0 or world.race_failed:
+			push_error("Main route driver crashed near point %d / CP %d at=%s boundary=%s impact=%s" % [index,world.race.next_gate,world.car.position,world.race_failed,world.impact_kind])
 			break
 		if world.race.finished:
 			done = true
@@ -44,12 +47,36 @@ func run() -> void:
 				next = candidate
 		index = next
 		var target_point: Vector3 = world.route[(index+3)%count]
-		# The regression driver steers around physical hazards, like a player.
-		for site in world.course.get_node("TrailObstacles").sites:
-			var separation: float = Vector2(target_point.x-site.position.x,target_point.z-site.position.z).length()
-			if separation<32:
-				var pose: Transform3D = world.course.pose_at(site.distance)
-				target_point -= pose.basis.x*site.blocked_side*1.1*(1-smoothstep(12,32,separation))
+		var sites: Array = world.course.get_node("TrailObstacles").sites
+		if active_jump<0:
+			for j in sites.size():
+				var site: Dictionary = sites[j]
+				var axis: Vector3 = -world.course.pose_at(site.distance).basis.z
+				axis.y = 0
+				var along: float = (world.car.position-site.position).dot(axis.normalized())
+				if not jumped.has(j) and along> -7.5 and along<5 and world.car.position.distance_to(site.position)<12 and world.car.fuel>0.35:
+					active_jump = j
+					burst_ticks = 0
+					break
+		if active_jump>=0:
+			burst_ticks += 4
+			if burst_ticks<=54: Input.action_press("burst")
+			else: Input.action_release("burst")
+			var exit_pose: Transform3D = world.course.pose_at(sites[active_jump].distance+8)
+			if burst_ticks>100 and world.car.contacts>=3:
+				if world.car.position.distance_to(exit_pose.origin)<6:
+					jumped[active_jump] = true
+				active_jump = -1
+		if world.car.contacts==0:
+			var omega: Vector3 = world.car.global_basis.inverse()*world.car.angular_velocity
+			var pitch: float = clampf(-asin(clampf(-world.car.global_basis.z.y,-1,1))*1.5-omega.x*0.35,-0.6,0.6)
+			var roll: float = clampf(asin(clampf(world.car.global_basis.x.y,-1,1))*1.5+omega.z*0.35,-0.6,0.6)
+			Input.action_press("pitch_forward",maxf(0,pitch))
+			Input.action_press("pitch_back",maxf(0,-pitch))
+			Input.action_press("roll_left",maxf(0,roll))
+			Input.action_press("roll_right",maxf(0,-roll))
+		else:
+			for action in ["pitch_forward","pitch_back","roll_left","roll_right"]: Input.action_release(action)
 		var delta: Vector3 = target_point-world.car.position
 		delta.y = 0
 		delta = delta.normalized()
@@ -81,7 +108,7 @@ func run() -> void:
 		Input.action_press("brake",0.45 if speed>target+0.5 else 0.0)
 		if tick%6000==0:
 			print("Lap tick=",tick," index=",index," CP=",world.race.next_gate," speed=",speed," at=",world.car.position," error=",error)
-	for action in ["throttle","brake","steer_left","steer_right"]:
+	for action in ["throttle","brake","steer_left","steer_right","burst","pitch_forward","pitch_back","roll_left","roll_right"]:
 		Input.action_release(action)
 	print("Physical off-road lap: ","1/1 passed" if done else "0/1 passed", " time=",world.race.elapsed," CP=",world.race.next_gate)
 	world.queue_free()

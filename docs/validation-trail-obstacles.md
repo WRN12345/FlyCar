@@ -1,15 +1,9 @@
-# Forest trail obstacles
+# Mandatory flight obstacles
 
-Requested: rocks and fallen trees on the road, with physical collisions and useful driving choices.
-
-- Added a course-owned `TrailObstacles` node after route/checkpoint construction.
-- 23 deterministic sites, alternating blocked sides: 8 boulders, 8 fallen trunks, 7 four-rock gardens (44 main bodies).
-- Reuses the forest rock/bark materials. Trunks have exposed end grain, broken branches and convex collision matching their meshes; branches have separate convex shapes.
-- Fallen trees now include tapering trunk extensions, 15 forked crown limbs, 480 alpha-cut leaf sprays, 14 forked exposed roots and an uprooted soil plate with irregular clods. Trunk/major branches/root plates collide; leaf cards and fine root hairs do not form collision walls.
-- Root placement is anchored 6.8 m laterally from each route site. The tree falls diagonally inward and along the route; local growth always runs from the root toward the crown, regardless of which roadside it grew on. Root plates are tested to remain more than 4 m from the actual sampled trail, and crown tips must be closer to the road than their roots. The opposite lane remains open.
-- Placement samples terrain at trunk endpoints. Start/finish approaches, checkpoint recovery neighborhoods, deep/shallow river and canyon launch/landing region are excluded.
-- A 2 m wide bypass is checked with real physics shape queries. Every main body is ray-tested against the active physics world.
-- Timing triggers, manual jets, environment-dependent crash handling and mouse orbit remain active. No world signs are added.
-- The full-route regression driver now slows near hazards and follows a smooth bypass; this assistance exists only in the test, not the playable car.
-
-Verification: `tests/test_trail_obstacles.gd` checks site distribution, both obstacle families, checkpoint clearance, collider activation and car-width bypass. Existing full physical lap, shortcuts and vehicle/controller regression scripts are run before publishing. `tests/capture_trail_obstacles.gd` creates native game screenshots for all three obstacle types.
+- 16 deterministic flight sites: 6 three-boulder barriers, 5 full-road fallen trunks and 5 five-rock piles (43 rocks and 5 trees).
+- Real convex colliders fill the legal road width. Car-width ground shape sweeps verify there is no side bypass; fences and fatal boundary enforcement prevent off-road bypasses.
+- Tree roots remain 6.8 m off the road. Main trunks are about 9.8 m long and 0.92-1.16 m in diameter, falling nearly perpendicular to the road. Extended forked leafy crowns attach beyond the enlarged trunk; root coordinates remain unchanged.
+- Sites are selected near the original spacing, with at least 70 m separation, bank <=7%, grade <=16% and nearly straight approach/landing directions. Checkpoint neighborhoods, ford and canyon runway are excluded.
+- Each site is physically tested twice using real car forces: ground throttle must fail, manual Space takeoff/attitude input must cross and land. No teleport, direct force or special invulnerability is used during a trial. Current result: 32/32 checks across all 16 sites.
+- Full-route regression driver uses jet and attitude inputs instead of a ground bypass. This assistance exists only in the test; playable controls remain manual.
+- Boundary failure is terminal and does not automatically restore the car. Wrecks include a substantial chassis and larger shards; airborne wreck debris falls to the local terrain instead of an invisible elevated floor.

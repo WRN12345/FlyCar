@@ -31,11 +31,11 @@ func run() -> void:
 		var plate: Vector3 = tree.get_node("UprootedSoilPlate").global_position
 		if course.terrain.trail_distance(Vector2(plate.x,plate.z))<4.0:
 			roots_off_road = false
-		var tip: Vector3 = tree.to_global(Vector3(0.15,7.7,0.45))
-		if course.terrain.trail_distance(Vector2(tip.x,tip.z))>=course.terrain.trail_distance(Vector2(root.x,root.z)):
+		var trunk: Vector3 = tree.get_node("MainTrunk").global_position
+		if course.terrain.trail_distance(Vector2(trunk.x,trunk.z))>=course.terrain.trail_distance(Vector2(root.x,root.z)):
 			crowns_face_road = false
 	check(roots_off_road,"All root plates stay in the forest beyond the road and verge")
-	check(crowns_face_road,"Each tree falls from its off-road root toward the trail")
+	check(crowns_face_road,"Each main trunk falls from its off-road root across the trail")
 	var safe := true
 	for site in hazards.sites:
 		for gate in course.gates:
@@ -51,22 +51,26 @@ func run() -> void:
 		if hit.is_empty() or hit.collider != body:
 			collidable = false
 	check(collidable,"Every visible main obstacle has an active physical collider")
-	# A car-width corridor at the opposite side must remain unobstructed.
-	var bypass := true
+	# Every ground-level car-width lane must now intersect a real obstacle.
+	var blocked := true
 	for site in hazards.sites:
 		var pose: Transform3D = course.pose_at(site.distance)
-		for along in range(-6,7,2):
-			var p: Vector3 = pose.origin-pose.basis.x*site.blocked_side*1.1+pose.basis.z*along
+		for across in [-1.5,0.0,1.5]:
+			var p: Vector3 = pose.origin+pose.basis.x*across
 			p.y = load("res://scripts/offroad_model.gd").height_at(p.x,p.z)+0.7
 			var box := BoxShape3D.new()
 			box.size = Vector3(2.0,0.6,4.22)
 			var query := PhysicsShapeQueryParameters3D.new()
 			query.shape = box
 			query.transform = Transform3D(pose.basis,p)
+			var hit_obstacle := false
 			for hit in root.world_3d.direct_space_state.intersect_shape(query):
 				if hit.collider.get_meta("trail_hazard",false):
-					bypass = false
-	check(bypass,"Car-width bypass remains beside each obstacle")
+					hit_obstacle = true
+			if not hit_obstacle:
+				blocked = false
+				print("Open ground lane at site ",site.distance," across=",across)
+	check(blocked,"Full-width rocks and trunks leave no ground-level car-width bypass")
 	print("Trail obstacles: %d/%d passed; sites=%d"%[checks-failures,checks,hazards.sites.size()])
 	course.free()
 	quit(1 if failures else 0)

@@ -28,16 +28,25 @@ func run() -> void:
 	world.car.fuel = 0.5
 	world.car.position = outside+Vector3.UP*8
 	world._physics_process(1.0/120)
-	check(world.race.recoveries==1 and world.car.pending_reset and world.banner.text.contains("OUT OF BOUNDS"),"Airborne boundary violation recovers with a clear warning")
-	check(world.race.elapsed>=3.0 and is_equal_approx(world.car.fuel,0.5),"Boundary penalty adds three seconds without refilling fuel")
-	world._physics_process(1.0/120)
-	check(world.race.recoveries==1,"Pending recovery cannot repeatedly charge the penalty")
+	check(world.race_failed and world.car.freeze and not world.car.visible and not world.car.pending_reset,"Airborne boundary violation instantly wrecks the vehicle")
+	check(world.race.recoveries==0 and is_equal_approx(world.car.fuel,0.5),"Fatal boundary does not recover or refill fuel")
+	var crash_position: Vector3 = world.car.position
+	var stopped_time: float = world.race.elapsed
+	for i in 600: world._physics_process(1.0/120)
+	world.recover()
+	check(world.race_failed and world.car.freeze and world.car.position==crash_position and not world.car.pending_reset,"Wreck persists after animation and R cannot restore the car")
+	check(world.race.elapsed==stopped_time,"Failed race stops its timer")
+	world.race.next_gate = 0
+	world._gate_entered(world.car,0)
+	check(not world.race.finished,"Failed car cannot finish the race")
+	world.restart_race()
 	for i in 4: await physics_frame
-	check(world.car.position.distance_to(world.recovery_pose.origin)<1.0,"Vehicle actually returns to latest checkpoint")
+	world.countdown = 0
+	check(not world.race_failed and world.car.visible,"Explicit restart creates a new attempt")
 	world.car.freeze = true
 	world.car.position = pose.origin+Vector3.UP*10
 	world._physics_process(1.0/120)
-	check(world.race.recoveries==1,"Legal flight does not trigger recovery")
+	check(not world.race_failed and world.race.recoveries==0,"Legal flight is not a boundary violation")
 	world.race.next_gate = 0
 	var elapsed: float = world.race.elapsed
 	var best_before: float = world.best_time

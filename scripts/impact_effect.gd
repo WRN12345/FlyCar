@@ -4,6 +4,7 @@ const Visual = preload("res://scripts/roadster_visual.gd")
 var kind := "land"
 var impact_velocity := Vector3.ZERO
 var elapsed := 0.0
+var floor_height := 0.25
 var parts: Array[MeshInstance3D] = []
 var velocities: Array[Vector3] = []
 var rings: Array[MeshInstance3D] = []
@@ -29,6 +30,9 @@ func build_wreck() -> void:
 	var body_paint := Visual.paint()
 	var metal := Geo.material(Color("333e49"), 0.6)
 	var glass := Geo.material(Color("19394a"), 0.4)
+	var chassis := BoxMesh.new()
+	chassis.size = Vector3(1.8,0.28,2.4)
+	add_part(chassis,Vector3(0,0.25,0),metal,throw_velocity(2.5))
 	# Hood, doors, roof and rear panels remain identifiable after impact.
 	var panels := [[Vector3(1.5, 0.12, 1.15), Vector3(0, 0.3, -1.3)], [Vector3(0.13, 0.45, 1.6), Vector3(-0.9, 0.3, 0)], [Vector3(0.13, 0.45, 1.6), Vector3(0.9, 0.3, 0)], [Vector3(1.3, 0.14, 0.9), Vector3(0, 0.8, 0.1)], [Vector3(1.7, 0.25, 1.1), Vector3(0, 0.25, 1.4)]]
 	for i in panels.size():
@@ -45,7 +49,7 @@ func build_wreck() -> void:
 			wheel.rotation.z = PI / 2
 	for i in 20:
 		var mesh := BoxMesh.new()
-		mesh.size = Vector3(rng.randf_range(0.07, 0.2), 0.08, rng.randf_range(0.1, 0.35))
+		mesh.size = Vector3(rng.randf_range(0.16, 0.4), 0.12, rng.randf_range(0.2, 0.6))
 		add_part(mesh, Vector3(0, 0.4, 0), metal if i % 2 else body_paint, throw_velocity(9.0))
 
 func throw_velocity(strength: float) -> Vector3:
@@ -96,8 +100,8 @@ func _process(dt: float) -> void:
 		parts[i].position += velocities[i] * dt
 		velocities[i].y -= 14 * dt
 		if kind == "land":
-			if parts[i].position.y < 0.25:
-				parts[i].position.y = 0.25
+			if parts[i].position.y < floor_height:
+				parts[i].position.y = floor_height
 				velocities[i] *= Vector3(0.75, -0.25, 0.75)
 			parts[i].rotation += Vector3(3, 5, 2) * dt * minf(1, velocities[i].length() / 3)
 		else:

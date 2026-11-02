@@ -3,22 +3,24 @@ extends RefCounted
 const Assets = preload("res://scripts/forest_assets.gd")
 const Geo = preload("res://scripts/geometry.gd")
 
-static func add_to(body: StaticBody3D, growth: float, seed_value: int) -> void:
+static func add_to(body: StaticBody3D, growth: float, seed_value: int, crown_offset: float = 0.0) -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = seed_value+67291
 	var timber := SurfaceTool.new()
 	var leaves := SurfaceTool.new()
 	timber.begin(Mesh.PRIMITIVE_TRIANGLES)
 	leaves.begin(Mesh.PRIMITIVE_TRIANGLES)
-	var tip := Vector3(0.15,growth*7.7,0.45)
-	var start := Vector3(0,growth*2.65,0)
-	Assets.cylinder(timber,start,Vector3(0.12,growth*5,0.25),0.26,0.14,Color.WHITE)
-	Assets.cylinder(timber,Vector3(0.12,growth*5,0.25),tip,0.14,0.025,Color.WHITE)
-	add_collision(body,start,Vector3(0.12,growth*5,0.25),0.24,0.13)
+	var offset := Vector3(0,growth*crown_offset,0)
+	var tip := Vector3(0.15,growth*7.7,0.45)+offset
+	var start := Vector3(0,growth*2.65,0)+offset
+	var middle := Vector3(0.12,growth*5,0.25)+offset
+	Assets.cylinder(timber,start,middle,0.46,0.14,Color.WHITE)
+	Assets.cylinder(timber,middle,tip,0.14,0.025,Color.WHITE)
+	add_collision(body,start,middle,0.44,0.13)
 	for i in 15:
 		var t := float(i)/15
 		var angle := i*2.39996
-		var origin := Vector3(0,growth*(1.0+t*5.8),0.2*t)
+		var origin := Vector3(0,growth*(1.0+t*5.8),0.2*t)+offset
 		# Local Y follows the fallen trunk; local Z points above the ground.
 		var radial := Vector3(cos(angle),0,0.25+0.65*absf(sin(angle)))
 		var reach := (1-t*0.5)*rng.randf_range(1.7,2.8)
