@@ -56,7 +56,7 @@ func run() -> void:
 	for site in hazards.sites:
 		var pose: Transform3D = course.pose_at(site.distance)
 		for along in range(-6,7,2):
-			var p: Vector3 = pose.origin-pose.basis.x*site.blocked_side*1.5+pose.basis.z*along
+			var p: Vector3 = pose.origin-pose.basis.x*site.blocked_side*1.1+pose.basis.z*along
 			p.y = load("res://scripts/offroad_model.gd").height_at(p.x,p.z)+0.7
 			var box := BoxShape3D.new()
 			box.size = Vector3(2.0,0.6,4.22)

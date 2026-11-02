@@ -12,8 +12,18 @@ func run() -> void:
 	for i in 180:
 		await physics_frame
 	var index := 4
+	var arguments := OS.get_cmdline_user_args()
+	if not arguments.is_empty():
+		index = int(arguments[0])
+		var pose: Transform3D = world.course.pose_at(world.course.distances[index])
+		pose.origin += Vector3.UP*0.9
+		world.car.reset_to(pose)
+		world.race.next_gate = int(arguments[1]) if arguments.size()>1 else 1
+		for i in 4: await physics_frame
 	var count: int = world.route.size()
 	var done := false
+	var stalled_ticks := 0
+	var reversing_ticks := 0
 	for tick in 60000:
 		await physics_frame
 		if world.death_remaining>0 or world.race.recoveries>0:
@@ -39,7 +49,7 @@ func run() -> void:
 			var separation: float = Vector2(target_point.x-site.position.x,target_point.z-site.position.z).length()
 			if separation<32:
 				var pose: Transform3D = world.course.pose_at(site.distance)
-				target_point -= pose.basis.x*site.blocked_side*1.5*(1-smoothstep(12,32,separation))
+				target_point -= pose.basis.x*site.blocked_side*1.1*(1-smoothstep(12,32,separation))
 		var delta: Vector3 = target_point-world.car.position
 		delta.y = 0
 		delta = delta.normalized()
@@ -54,12 +64,23 @@ func run() -> void:
 				target = minf(target,6.0)
 		target *= clampf(1-absf(error),0.3,1)
 		var speed: float = world.car.linear_velocity.dot(forward)
+		stalled_ticks = stalled_ticks+4 if absf(speed)<0.3 else 0
+		if stalled_ticks>180:
+			reversing_ticks = 120
+			stalled_ticks = 0
+		if reversing_ticks>0:
+			Input.action_press("throttle",0)
+			Input.action_press("brake",1)
+			Input.action_press("steer_left",clampf(-error*2.8,0,1))
+			Input.action_press("steer_right",clampf(error*2.8,0,1))
+			reversing_ticks -= 4
+			continue
 		Input.action_press("steer_left",clampf(error*2.8,0,1))
 		Input.action_press("steer_right",clampf(-error*2.8,0,1))
 		Input.action_press("throttle",1.0 if speed<target else 0.0)
 		Input.action_press("brake",0.45 if speed>target+0.5 else 0.0)
 		if tick%6000==0:
-			print("Lap tick=",tick," index=",index," CP=",world.race.next_gate," speed=",speed)
+			print("Lap tick=",tick," index=",index," CP=",world.race.next_gate," speed=",speed," at=",world.car.position," error=",error)
 	for action in ["throttle","brake","steer_left","steer_right"]:
 		Input.action_release(action)
 	print("Physical off-road lap: ","1/1 passed" if done else "0/1 passed", " time=",world.race.elapsed," CP=",world.race.next_gate)

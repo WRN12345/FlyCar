@@ -8,10 +8,14 @@ func within_boundary(p: Vector3) -> bool:
 	var flat := Vector2(p.x,p.z)
 	if terrain.trail_distance(flat) <= Valley.TRAIL_HALF_WIDTH+Valley.TRAIL_EDGE:
 		return true
+	return in_shortcut_corridor(p)
+
+func in_shortcut_corridor(p: Vector3, margin: float = 0.0) -> bool:
+	var flat := Vector2(p.x,p.z)
 	for cut in shortcuts:
 		var a: Vector3 = cut.points[0]
 		var b: Vector3 = cut.points[1]
-		var width := 1.65 if cut.entry_gate==2 else 3.5
+		var width := (1.65 if cut.entry_gate==2 else 3.5)+margin
 		var exit: Vector3 = pose_at(gate_distances[cut.exit_gate]+15).origin
 		# Include the existing canyon runway and the landing/checkpoint connector.
 		var points: Array[Vector3] = [a,b,exit]
@@ -59,6 +63,9 @@ func build(definition: Dictionary) -> void:
 	var hazards := preload("res://scripts/trail_obstacles.gd").new()
 	add_child(hazards)
 	hazards.build(self)
+	var fence := preload("res://scripts/trail_fence.gd").new()
+	add_child(fence)
+	fence.build(self)
 
 func create_gate(index: int, pose: Transform3D) -> void:
 	# Keep timing and recovery triggers without placing artificial scenery.
