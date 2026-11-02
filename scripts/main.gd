@@ -63,6 +63,7 @@ func _ready() -> void:
 	car.process_mode = Node.PROCESS_MODE_PAUSABLE
 	add_child(car)
 	camera = Camera3D.new()
+	camera.physics_interpolation_mode = Node.PHYSICS_INTERPOLATION_MODE_OFF
 	camera.fov = 68
 	camera.far = 4000
 	add_child(camera)
@@ -436,7 +437,7 @@ func _physics_process(dt: float) -> void:
 			clear_impact()
 			recover()
 		return
-	mouse_look.probe(car)
+	mouse_look.step(camera,car,dt)
 	if boundary_enabled and countdown<=0 and course.has_method("within_boundary") and not course.within_boundary(car.position):
 		recover()
 		if not race.finished:
@@ -481,7 +482,7 @@ func _process(dt: float) -> void:
 		forward = Vector3.FORWARD
 	forward = forward.normalized()
 	if not car.pending_reset and death_remaining <= 0:
-		mouse_look.update(camera, car, dt)
+		mouse_look.render(camera)
 		camera.fov = lerpf(camera.fov, 68 + clampf(car.linear_velocity.length() * 0.17, 0, 12), 1 - exp(-dt * 3))
 	hud_speed.text = "%03d" % roundi(car.linear_velocity.length() * 3.6)
 	hud_time.text = format_time(race.elapsed)
