@@ -8,8 +8,6 @@ var sites: Array[Dictionary] = []
 func build(course: Node3D) -> void:
 	name = "TrailObstacles"
 	Assets.prepare()
-	var wood := Geo.material(Color("aa794b"))
-	var rings := Geo.material(Color("61412c"))
 	var sequence := 0
 	for distance in range(120, int(course.length)-80, 105):
 		var pose: Transform3D = course.pose_at(distance)
@@ -31,7 +29,7 @@ func build(course: Node3D) -> void:
 		if kind == 0:
 			rock(p+side*sign_value*1.35, Vector3(0.72,0.65,0.85), sequence)
 		elif kind == 1:
-			fallen_tree(p+side*sign_value*2.75, side, sequence, sign_value, wood, rings)
+			fallen_tree(p, side, sequence, sign_value)
 		else:
 			# A low rock garden occupies one side, leaving a continuous escape lane.
 			for j in 4:
@@ -53,10 +51,14 @@ func rock(p: Vector3, size: Vector3, seed_value: int) -> void:
 	collision.shape = mesh.create_convex_shape()
 	body.add_child(collision)
 
-func fallen_tree(p: Vector3, side: Vector3, index: int, blocked_side: float, wood: Material, rings: Material) -> void:
-	var axis := side.rotated(Vector3.UP,0.18 if index%2 else -0.18)
-	var a := p-axis*2.9
-	var b := p+axis*2.9
+func fallen_tree(p: Vector3, side: Vector3, index: int, blocked_side: float) -> void:
+	# The original growing point stays in the forest; the crown falls diagonally
+	# onto the near half of the trail, leaving the other half driveable.
+	var root := p+side*blocked_side*6.8
+	var forward := Vector3.UP.cross(side).normalized()
+	var axis := (-side*blocked_side*0.5+forward*0.8660254).normalized()
+	var a := root-axis*0.25
+	var b := root+axis*5.55
 	a.y = Model.height_at(a.x,a.z)+0.27
 	b.y = Model.height_at(b.x,b.z)+0.27
 	axis = (b-a).normalized()
@@ -64,8 +66,9 @@ func fallen_tree(p: Vector3, side: Vector3, index: int, blocked_side: float, woo
 	var basis := Basis(across,axis,across.cross(axis)).orthonormalized()
 	var body := StaticBody3D.new()
 	body.name = "FallenTree_%03d"%index
-	body.transform = Transform3D(basis,(a+b)*0.5+axis*blocked_side*0.85)
+	body.transform = Transform3D(basis,(a+b)*0.5)
 	body.set_meta("trail_hazard",true)
+	body.set_meta("root_anchor",root)
 	add_child(body)
 	var length := a.distance_to(b)
 	var mesh := CylinderMesh.new()
@@ -77,17 +80,12 @@ func fallen_tree(p: Vector3, side: Vector3, index: int, blocked_side: float, woo
 	var collision := CollisionShape3D.new()
 	collision.shape = mesh.create_convex_shape()
 	body.add_child(collision)
-	# Visible cut faces and concentric growth rings make the trunk readable.
-	for end in [-1,1]:
-		for ring in 3:
-			var radius := (0.255 if end==1 else 0.325)-ring*0.065
-			Geo.cylinder(body,radius,0.008,Vector3(0,end*(length*0.5+0.006+ring*0.006),0),wood if ring%2==0 else rings)
-	# Broken branches extend into the verge, away from the driveable bypass.
+	# Broken limbs follow the root-to-crown direction, independent of road side.
 	for j in 3:
-		var limb := Geo.cylinder(body,0.09+0.015*j,0.85+0.15*j,Vector3(0.12,blocked_side*(1.7+j*0.3),0.1),Assets.bark)
+		var limb := Geo.cylinder(body,0.09+0.015*j,0.85+0.15*j,Vector3(0.12,1.7+j*0.3,0.1),Assets.bark)
 		limb.rotation = Vector3(0.7+j*0.6,0,0.8+j*0.4)
 		var limb_collision := CollisionShape3D.new()
 		limb_collision.shape = limb.mesh.create_convex_shape()
 		limb_collision.transform = limb.transform
 		body.add_child(limb_collision)
-	preload("res://scripts/fallen_tree_details.gd").add_to(body,blocked_side,index)
+	preload("res://scripts/fallen_tree_details.gd").add_to(body,1.0,index)

@@ -24,6 +24,18 @@ func run() -> void:
 		elif crown.mesh.surface_get_arrays(1)[Mesh.ARRAY_VERTEX].size()<1000:
 			complete_trees = false
 	check(complete_trees,"Every fallen tree has forked branches, leafy crown and uprooted root plate")
+	var roots_off_road := true
+	var crowns_face_road := true
+	for tree in hazards.find_children("FallenTree*","StaticBody3D",true,false):
+		var root: Vector3 = tree.get_meta("root_anchor")
+		var plate: Vector3 = tree.get_node("UprootedSoilPlate").global_position
+		if course.terrain.trail_distance(Vector2(plate.x,plate.z))<4.0:
+			roots_off_road = false
+		var tip: Vector3 = tree.to_global(Vector3(0.15,7.7,0.45))
+		if course.terrain.trail_distance(Vector2(tip.x,tip.z))>=course.terrain.trail_distance(Vector2(root.x,root.z)):
+			crowns_face_road = false
+	check(roots_off_road,"All root plates stay in the forest beyond the road and verge")
+	check(crowns_face_road,"Each tree falls from its off-road root toward the trail")
 	var safe := true
 	for site in hazards.sites:
 		for gate in course.gates:
