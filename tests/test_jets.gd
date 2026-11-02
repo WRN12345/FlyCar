@@ -36,6 +36,11 @@ func run() -> void:
 	spent = control.consume(PackedFloat32Array([1,1,1,1]), 0.0, 1.0 / 120)
 	check(spent.duties == PackedFloat32Array([0,0,0,0]), "empty tank produces no thrust")
 	var quarter: Dictionary = control.consume(PackedFloat32Array([1,0,0,0]), 1.0, 0.12)
-	check(is_equal_approx(quarter.fuel, 0.975), "gas use follows actual sum of nozzle duties")
+	check(is_equal_approx(quarter.fuel, 1.0-0.25*0.12/1.8), "gas use follows actual sum of nozzle duties with 1.5x endurance")
+	var tank := 1.0
+	for i in 180:
+		tank = control.consume(PackedFloat32Array([1,1,1,1]),tank,0.01).fuel
+	check(tank<0.00001,"full-power tank lasts 1.8 seconds")
+	check(is_equal_approx(control.consume(PackedFloat32Array([1,1,1,1]),1.0,1.2).fuel,1.0/3.0),"old 1.2-second burst leaves one third of the larger tank")
 	print("Thruster controller: ", checks - failures, "/", checks, " passed")
 	quit(1 if failures else 0)

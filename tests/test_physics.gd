@@ -44,7 +44,7 @@ func run() -> void:
 	Input.action_press("burst")
 	await frames(30)
 	check(car.position.y > 1.8, "nozzle forces produce lift")
-	await frames(65)
+	await frames(90)
 	check(car.fuel <= 0.001, "burst is finite")
 	var empty_vertical_speed: float = car.linear_velocity.y
 	await frames(30)

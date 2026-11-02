@@ -19,6 +19,8 @@ func run() -> void:
 		quit(1)
 		return
 	world.switch_track(world.active_index)
+	# This suite isolates terrain/crash physics; route enforcement has its own test.
+	world.boundary_enabled = false
 	world.countdown = 0
 	world.car.freeze = false
 	await frames(180)

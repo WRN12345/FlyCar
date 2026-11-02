@@ -11,6 +11,7 @@ const Menu = preload("res://scripts/track_menu.gd")
 const Impact = preload("res://scripts/impact_effect.gd")
 var mouse_look = preload("res://scripts/orbit_camera.gd").new()
 var car: RigidBody3D
+var boundary_enabled := true
 var camera: Camera3D
 var course: Node3D
 var menu: CanvasLayer
@@ -225,7 +226,9 @@ func begin_surface_impact(surface: Dictionary) -> void:
 	banner.text = "VEHICLE SUBMERGING\n落水 · 车辆正在下沉" if impact_kind == "water" else "VEHICLE WRECKED\n撞击地面 · 车身碎裂"
 
 func _gate_entered(body: Node3D, index: int) -> void:
-	if body != car or countdown > 0 or death_remaining > 0:
+	if body != car or countdown > 0 or death_remaining > 0 or car.pending_reset:
+		return
+	if boundary_enabled and course.has_method("within_boundary") and not course.within_boundary(car.position):
 		return
 	if race.pass_gate(index, car.linear_velocity.dot(-gates[index].basis.z) > 0.5):
 		if course.has_method("recovery_at_gate"):
@@ -434,6 +437,12 @@ func _physics_process(dt: float) -> void:
 			recover()
 		return
 	mouse_look.probe(car)
+	if boundary_enabled and countdown<=0 and course.has_method("within_boundary") and not course.within_boundary(car.position):
+		recover()
+		if not race.finished:
+			banner.text = "OUT OF BOUNDS  +3.0s\n超出道路边界 · 已返回检查点"
+			message_time = 2.0
+		return
 	if countdown > 0:
 		countdown = maxf(0, countdown - dt)
 		if not car.pending_reset:

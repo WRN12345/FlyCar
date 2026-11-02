@@ -3,7 +3,7 @@ extends RefCounted
 
 static func next_fuel(current: float, burning: bool, grounded: bool, dt: float) -> float:
 	if burning:
-		return maxf(0.0, current - dt / 1.2)
+		return maxf(0.0, current - dt / preload("res://scripts/thruster_control.gd").TANK_SECONDS)
 	return minf(1.0, current + dt * 0.5) if grounded else current
 
 static func can_recharge(contacts: int, supported_load: float, upright: float, mass: float) -> bool:

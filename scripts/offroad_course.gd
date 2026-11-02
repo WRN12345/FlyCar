@@ -4,6 +4,24 @@ const Ground = preload("res://scripts/offroad_model.gd")
 var gate_distances: Array[float] = []
 var shortcuts: Array = []
 
+func within_boundary(p: Vector3) -> bool:
+	var flat := Vector2(p.x,p.z)
+	if terrain.trail_distance(flat) <= Valley.TRAIL_HALF_WIDTH+Valley.TRAIL_EDGE:
+		return true
+	for cut in shortcuts:
+		var a: Vector3 = cut.points[0]
+		var b: Vector3 = cut.points[1]
+		var width := 1.65 if cut.entry_gate==2 else 3.5
+		var exit: Vector3 = pose_at(gate_distances[cut.exit_gate]+15).origin
+		# Include the existing canyon runway and the landing/checkpoint connector.
+		var points: Array[Vector3] = [a,b,exit]
+		if cut.entry_gate==5:
+			points = [Vector3(439,0,-535),Vector3(432,0,-460),exit]
+		for i in points.size()-1:
+			if Valley.distance_to_segment(flat,Vector2(points[i].x,points[i].z),Vector2(points[i+1].x,points[i+1].z)) <= width:
+				return true
+	return false
+
 func build(definition: Dictionary) -> void:
 	data = definition
 	name = "ActiveCourse"

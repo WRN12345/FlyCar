@@ -40,7 +40,7 @@ func run()->void:
 		check(car.fuel>0.9,"tank returns to ready between ordinary jumps: cycle %d"%cycle)
 	car.fuel=.2
 	Input.action_press("burst")
-	await frames(40)
+	await frames(60)
 	check(car.fuel<=.001 and car.burst_locked,"actual nozzle firing exhausts the remaining tank and enters release protection")
 	await frames(480)
 	check(car.fuel>.9 and not car.burning,"actual exhausted flight lands and refills without trigger sputtering")

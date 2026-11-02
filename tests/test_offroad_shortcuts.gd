@@ -39,7 +39,7 @@ func run() -> void:
 			control(end if grass_waypoint else grass_exit,12)
 		if world.race.next_gate==4 or world.death_remaining>0:
 			break
-	var grass_ok: bool=world.race.next_gate==4 and world.death_remaining==0
+	var grass_ok: bool=world.race.next_gate==4 and world.death_remaining==0 and world.race.recoveries==0
 	print("Grass shortcut: ",grass_ok," CP=",world.race.next_gate," at=",world.car.position)
 	if not grass_ok:
 		failures+=1
@@ -77,7 +77,7 @@ func run() -> void:
 				Input.action_release("burst")
 		if world.race.next_gate==7 or world.death_remaining>0:
 			break
-	var canyon_ok: bool=world.race.next_gate==7 and world.death_remaining==0 and launched
+	var canyon_ok: bool=world.race.next_gate==7 and world.death_remaining==0 and launched and world.race.recoveries==0
 	print("Canyon shortcut: ",canyon_ok," CP=",world.race.next_gate," at=",world.car.position," fuel=",world.car.fuel," v=",world.car.linear_velocity," tilt=",world.car.rotation_degrees," impact=",world.car.severe_impact_speed)
 	if not canyon_ok:
 		failures+=1

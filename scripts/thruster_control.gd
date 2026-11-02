@@ -1,7 +1,7 @@
 extends RefCounted
 ## Game tuning in SI units; not inferred Tesla hardware specifications.
 const NOZZLES := [Vector3(-0.6324, -0.19, -0.952), Vector3(0.6324, -0.19, -0.952), Vector3(-0.6324, -0.19, 0.952), Vector3(0.6324, -0.19, 0.952)]
-const TANK_SECONDS := 1.2
+const TANK_SECONDS := 1.8
 const PROBE_LENGTH := 12.0
 
 static func landing_duty(height: float, vertical_speed: float, upright: float, road_below: bool, contacts: int, lift_acceleration: float) -> float:

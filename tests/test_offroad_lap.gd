@@ -33,7 +33,7 @@ func run() -> void:
 				nearest = distance
 				next = candidate
 		index = next
-		var target_point: Vector3 = world.route[(index+6)%count]
+		var target_point: Vector3 = world.route[(index+3)%count]
 		# The regression driver steers around physical hazards, like a player.
 		for site in world.course.get_node("TrailObstacles").sites:
 			var separation: float = Vector2(target_point.x-site.position.x,target_point.z-site.position.z).length()
