@@ -33,7 +33,14 @@ func run() -> void:
 				nearest = distance
 				next = candidate
 		index = next
-		var delta: Vector3 = world.route[(index+6)%count]-world.car.position
+		var target_point: Vector3 = world.route[(index+6)%count]
+		# The regression driver steers around physical hazards, like a player.
+		for site in world.course.get_node("TrailObstacles").sites:
+			var separation: float = Vector2(target_point.x-site.position.x,target_point.z-site.position.z).length()
+			if separation<32:
+				var pose: Transform3D = world.course.pose_at(site.distance)
+				target_point -= pose.basis.x*site.blocked_side*1.5*(1-smoothstep(12,32,separation))
+		var delta: Vector3 = target_point-world.car.position
 		delta.y = 0
 		delta = delta.normalized()
 		var forward: Vector3 = -world.car.global_basis.z
@@ -42,6 +49,9 @@ func run() -> void:
 		var error := atan2(forward.cross(delta).y,forward.dot(delta))
 		var surface: Dictionary = world.course.terrain.surface_at(world.car.position)
 		var target: float = {"dirt":15.0,"gravel":12.0,"mud":9.0,"grass":12.0,"water":7.0,"rock":11.0}[surface.material]
+		for site in world.course.get_node("TrailObstacles").sites:
+			if Vector2(world.car.position.x-site.position.x,world.car.position.z-site.position.z).length()<36:
+				target = minf(target,6.0)
 		target *= clampf(1-absf(error),0.3,1)
 		var speed: float = world.car.linear_velocity.dot(forward)
 		Input.action_press("steer_left",clampf(error*2.8,0,1))

@@ -38,6 +38,9 @@ func build(definition: Dictionary) -> void:
 	for cut in shortcuts:
 		for i in cut.points.size():
 			cut.points[i].y = Ground.height_at(cut.points[i].x,cut.points[i].z)
+	var hazards := preload("res://scripts/trail_obstacles.gd").new()
+	add_child(hazards)
+	hazards.build(self)
 
 func create_gate(index: int, pose: Transform3D) -> void:
 	# Keep timing and recovery triggers without placing artificial scenery.

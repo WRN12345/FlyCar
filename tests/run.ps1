@@ -15,6 +15,7 @@ Invoke-Check 'import' @('--editor', '--import')
 foreach ($name in @('math', 'physics', 'race', 'world', 'obstacles', 'catalog', 'china', 'china_obstacles', 'surfaces', 'road_corners', 'car_visual', 'jets', 'landing', 'jet_effects', 'offroad_model', 'offroad', 'offroad_drive', 'rugged_trails', 'repeat_jets', 'forest_scene', 'mouse_look')) {
     Invoke-Check $name @('--script', "tests/test_$name.gd")
 }
+Invoke-Check 'trail_obstacles' @('--script','tests/test_trail_obstacles.gd')
 Invoke-Check 'offroad_lap' @('--fixed-fps','120','--script','tests/test_offroad_lap.gd')
 Invoke-Check 'offroad_shortcuts' @('--fixed-fps','120','--script','tests/test_offroad_shortcuts.gd')
 Write-Output 'PASS: all FlyCar checks completed.'

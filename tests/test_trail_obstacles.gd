@@ -1,0 +1,52 @@
+extends SceneTree
+var failures := 0
+var checks := 0
+func check(ok: bool, message: String) -> void:
+	checks += 1
+	if not ok:
+		failures += 1
+		push_error(message)
+func _initialize() -> void:
+	call_deferred("run")
+func run() -> void:
+	var course = load("res://scripts/offroad_course.gd").new()
+	root.add_child(course)
+	course.build(JSON.parse_string(FileAccess.get_file_as_string("res://tracks/04_valley.json")))
+	var hazards = course.get_node("TrailObstacles")
+	check(hazards.sites.size()>=15,"Obstacles distributed around the route")
+	check(hazards.find_children("FallenTree*","StaticBody3D",true,false).size()>=4,"Multiple collidable fallen trees")
+	check(hazards.find_children("RouteRock*","StaticBody3D",true,false).size()>=15,"Boulders and rock gardens")
+	var safe := true
+	for site in hazards.sites:
+		for gate in course.gates:
+			if Vector2(site.position.x-gate.origin.x,site.position.z-gate.origin.z).length()<36:
+				safe = false
+	check(safe,"Checkpoint and recovery approaches stay clear")
+	await physics_frame
+	await physics_frame
+	var collidable := true
+	for body in hazards.get_children():
+		var query := PhysicsRayQueryParameters3D.create(body.position+Vector3.UP*5,body.position+Vector3.DOWN*2)
+		var hit := root.world_3d.direct_space_state.intersect_ray(query)
+		if hit.is_empty() or hit.collider != body:
+			collidable = false
+	check(collidable,"Every visible main obstacle has an active physical collider")
+	# A car-width corridor at the opposite side must remain unobstructed.
+	var bypass := true
+	for site in hazards.sites:
+		var pose: Transform3D = course.pose_at(site.distance)
+		for along in range(-6,7,2):
+			var p: Vector3 = pose.origin-pose.basis.x*site.blocked_side*1.5+pose.basis.z*along
+			p.y = load("res://scripts/offroad_model.gd").height_at(p.x,p.z)+0.7
+			var box := BoxShape3D.new()
+			box.size = Vector3(2.0,0.6,4.22)
+			var query := PhysicsShapeQueryParameters3D.new()
+			query.shape = box
+			query.transform = Transform3D(pose.basis,p)
+			for hit in root.world_3d.direct_space_state.intersect_shape(query):
+				if hit.collider.get_meta("trail_hazard",false):
+					bypass = false
+	check(bypass,"Car-width bypass remains beside each obstacle")
+	print("Trail obstacles: %d/%d passed; sites=%d"%[checks-failures,checks,hazards.sites.size()])
+	course.free()
+	quit(1 if failures else 0)
