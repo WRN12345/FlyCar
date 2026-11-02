@@ -63,17 +63,20 @@ func panel(a: Vector3,b: Vector3,side: float) -> void:
 	var length := a.distance_to(b)
 	for height in [0.48,1.0]:
 		var pose := box_pose(a,b,height)
-		data.poses.append(Transform3D(pose.basis*Basis.from_scale(Vector3(0.14,0.14,length+0.08)),pose.origin))
-	# Full panel collision prevents squeezing the chassis between wooden rails.
-	var collision := CollisionShape3D.new()
-	var shape := BoxShape3D.new()
-	shape.size = Vector3(0.18,1.25,length+0.08)
-	collision.shape = shape
-	collision.transform = box_pose(a,b,0.57)
-	data.body.add_child(collision)
-	data.poses.append(Transform3D(Basis.IDENTITY.scaled(Vector3(0.2,1.35,0.2)),a+Vector3.UP*0.55))
+		wood_piece(data,pose,Vector3(0.14,0.14,length+0.08))
+	wood_piece(data,Transform3D(Basis.IDENTITY,a+Vector3.UP*0.55),Vector3(0.2,1.35,0.2))
 	post_count += 1
 	panels.append({"a":a,"b":b,"side":side})
+
+func wood_piece(data: Dictionary, pose: Transform3D, size: Vector3) -> void:
+	# Rendering and collision use the same dimensions and transform.
+	data.poses.append(Transform3D(pose.basis*Basis.from_scale(size),pose.origin))
+	var collision := CollisionShape3D.new()
+	var shape := BoxShape3D.new()
+	shape.size = size
+	collision.shape = shape
+	collision.transform = pose
+	data.body.add_child(collision)
 
 func flush() -> void:
 	var box := BoxMesh.new()

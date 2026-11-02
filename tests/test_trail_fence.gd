@@ -42,15 +42,42 @@ func run() -> void:
 	check(aligned,"Rotated rail meshes retain local thickness and meet their posts")
 	await physics_frame
 	await physics_frame
+	var sample: Dictionary = fence.panels[20]
+	var midpoint: Vector3 = sample.a.lerp(sample.b,0.5)
+	var normal := Basis.looking_at((sample.b-sample.a).normalized(),Vector3.UP).x
+	var gap := midpoint+Vector3.UP*0.74
+	var gap_query := PhysicsRayQueryParameters3D.create(gap-normal*0.5,gap+normal*0.5)
+	var gap_hit := root.world_3d.direct_space_state.intersect_ray(gap_query)
+	check(gap_hit.is_empty() or not gap_hit.collider.get_meta("trail_fence",false),"Empty space between wooden rails is not an invisible wall")
 	var pose: Transform3D = course.pose_at(75)
 	var collisions := true
 	for side in [-1,1]:
-		var a := pose.origin+Vector3.UP*0.7
-		var query := PhysicsRayQueryParameters3D.create(a,a+pose.basis.x*side*5)
+		var closest := INF
+		var panel: Dictionary = {}
+		for candidate in fence.panels:
+			var separation: float = candidate.a.lerp(candidate.b,0.5).distance_squared_to(pose.origin)
+			if candidate.side==side and separation<closest:
+				closest = separation
+				panel = candidate
+		var center: Vector3 = panel.a.lerp(panel.b,0.5)+Vector3.UP
+		var cross_axis := Basis.looking_at((panel.b-panel.a).normalized(),Vector3.UP).x
+		var query := PhysicsRayQueryParameters3D.create(center-cross_axis*0.5,center+cross_axis*0.5)
 		var hit := root.world_3d.direct_space_state.intersect_ray(query)
 		if hit.is_empty() or not hit.collider.get_meta("trail_fence",false):
 			collisions = false
 	check(collisions,"Both roadside fences physically block lateral travel")
+	var matched := true
+	for data in fence.chunks.values():
+		var shapes: Array = data.body.get_children()
+		if shapes.size()!=data.poses.size():
+			matched = false
+			continue
+		for i in shapes.size():
+			var rendered: Transform3D = data.poses[i]
+			var size := Vector3(rendered.basis.x.length(),rendered.basis.y.length(),rendered.basis.z.length())
+			if not shapes[i].shape.size.is_equal_approx(size) or not shapes[i].position.is_equal_approx(rendered.origin):
+				matched = false
+	check(matched,"Every collider matches a visible rail or post; no full panel remains")
 	var car = load("res://scripts/car.gd").new()
 	root.add_child(car)
 	car.surface_provider = course.terrain
