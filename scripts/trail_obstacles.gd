@@ -64,7 +64,7 @@ func fallen_tree(p: Vector3, side: Vector3, index: int, blocked_side: float, woo
 	var basis := Basis(across,axis,across.cross(axis)).orthonormalized()
 	var body := StaticBody3D.new()
 	body.name = "FallenTree_%03d"%index
-	body.transform = Transform3D(basis,(a+b)*0.5)
+	body.transform = Transform3D(basis,(a+b)*0.5+axis*blocked_side*0.85)
 	body.set_meta("trail_hazard",true)
 	add_child(body)
 	var length := a.distance_to(b)
@@ -90,3 +90,4 @@ func fallen_tree(p: Vector3, side: Vector3, index: int, blocked_side: float, woo
 		limb_collision.shape = limb.mesh.create_convex_shape()
 		limb_collision.transform = limb.transform
 		body.add_child(limb_collision)
+	preload("res://scripts/fallen_tree_details.gd").add_to(body,blocked_side,index)

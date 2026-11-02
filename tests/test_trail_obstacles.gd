@@ -16,6 +16,14 @@ func run() -> void:
 	check(hazards.sites.size()>=15,"Obstacles distributed around the route")
 	check(hazards.find_children("FallenTree*","StaticBody3D",true,false).size()>=4,"Multiple collidable fallen trees")
 	check(hazards.find_children("RouteRock*","StaticBody3D",true,false).size()>=15,"Boulders and rock gardens")
+	var complete_trees := true
+	for tree in hazards.find_children("FallenTree*","StaticBody3D",true,false):
+		var crown = tree.get_node_or_null("BranchedLeafyCrown")
+		if crown==null or crown.mesh.get_surface_count()!=2 or tree.get_node_or_null("ExposedForkedRoots")==null or tree.get_node_or_null("UprootedSoilPlate")==null:
+			complete_trees = false
+		elif crown.mesh.surface_get_arrays(1)[Mesh.ARRAY_VERTEX].size()<1000:
+			complete_trees = false
+	check(complete_trees,"Every fallen tree has forked branches, leafy crown and uprooted root plate")
 	var safe := true
 	for site in hazards.sites:
 		for gate in course.gates:

@@ -5,6 +5,8 @@ Requested: rocks and fallen trees on the road, with physical collisions and usef
 - Added a course-owned `TrailObstacles` node after route/checkpoint construction.
 - 23 deterministic sites, alternating blocked sides: 8 boulders, 8 fallen trunks, 7 four-rock gardens (44 main bodies).
 - Reuses the forest rock/bark materials. Trunks have exposed end grain, broken branches and convex collision matching their meshes; branches have separate convex shapes.
+- Fallen trees now include tapering trunk extensions, 15 forked crown limbs, 480 alpha-cut leaf sprays, 14 forked exposed roots and an uprooted soil plate with irregular clods. Trunk/major branches/root plates collide; leaf cards and fine root hairs do not form collision walls.
+- Whole fallen trees are set 0.85 m farther into the verge to accommodate the root plate during real steering approaches.
 - Placement samples terrain at trunk endpoints. Start/finish approaches, checkpoint recovery neighborhoods, deep/shallow river and canyon launch/landing region are excluded.
 - A 2 m wide bypass is checked with real physics shape queries. Every main body is ray-tested against the active physics world.
 - Timing triggers, manual jets, environment-dependent crash handling and mouse orbit remain active. No world signs are added.
